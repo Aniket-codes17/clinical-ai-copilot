@@ -18,3 +18,4 @@ def greet(name):
     return "Hello " + name
 print(greet("Doctor"))
 print(greet("Nurse"))
+print("hello")
