@@ -1,15 +1,1 @@
-torch
-torchvision
-opencv-python
-scikit-learn
 pandas
-numpy
-matplotlib
-seaborn
-langchain
-langgraph
-langchain-community
-faiss-cpu
-streamlit
-grad-cam
-python-dotenv
