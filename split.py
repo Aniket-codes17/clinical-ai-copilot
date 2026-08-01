@@ -56,3 +56,4 @@ print(classification_report(y_test, rf.predict(X_test)))
 
 
 import joblib
+joblib.dump(rf, "clinical_model.joblib")
