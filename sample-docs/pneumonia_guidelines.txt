@@ -1,0 +1,4 @@
+Community-Acquired Pneumonia (CAP) Treatment Guidelines:
+1. Empiric outpatient treatment for healthy adults: Amoxicillin 1g TID, or Doxycycline 100mg BID.
+2. For patients with comorbidities: Augmentin or a cephalosporin PLUS a macrolide or respiratory fluoroquinolone (e.g., Levofloxacin).
+3. Diagnostic imaging: Chest Radiograph (X-ray) remains the gold standard to identify lobar consolidation or interstitial infiltrates.
