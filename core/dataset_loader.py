@@ -16,25 +16,24 @@ from transformers import (
     pipeline,
 )
 
-# 1. Ensure directory exists
 os.makedirs("./results", exist_ok=True)
 
 print("Downloading dataset from Hugging Face...")
 dataset = load_dataset("hf-vision/chest-xray-pneumonia")
 
-# Define a single path variable
+
 image_path = "./results/xray.png"
 
 sample_image = dataset["test"][0]["image"]
 sample_image.save(image_path)
 print(f"Saved sample chest image successfully as '{image_path}'.")
 
-# 2. Pipeline Inference
+
 clf = pipeline("image-classification")
 predictions = clf(image_path)  # Pass the correct path variable
 print(predictions)
 
-# 3. Grad-CAM Setup
+
 model = models.resnet50(pretrained=True)
 model.eval()
 
@@ -63,7 +62,6 @@ cv2.imwrite(
 )
 print(f"Saved Grad-CAM heatmap visualization to '{output_heatmap_path}'.")
 
-# 4. Fine-Tuning Setup
 processor = AutoImageProcessor.from_pretrained("microsoft/resnet-50")
 
 

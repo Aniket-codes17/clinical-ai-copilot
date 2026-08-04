@@ -9,7 +9,7 @@ from pytorch_grad_cam.utils.image import show_cam_on_image
 from transformers import AutoModelForImageClassification
 
 
-# 1. Wrapper to output logits for GradCAM compatibility
+
 class HuggingFaceModelWrapper(torch.nn.Module):
 
     def __init__(self, hf_model):
@@ -21,7 +21,7 @@ class HuggingFaceModelWrapper(torch.nn.Module):
         return output.logits
 
 
-# 2. Setup output directory and model paths
+
 os.makedirs("./results", exist_ok=True)
 
 model_path = "./final_pneumonia_cnn_model"
@@ -31,10 +31,9 @@ hf_model = AutoModelForImageClassification.from_pretrained(model_path)
 wrapped_model = HuggingFaceModelWrapper(hf_model)
 wrapped_model.eval()
 
-# Target final convolutional layer group in Hugging Face ResNet
+
 target_layers = [hf_model.resnet.encoder.stages[-1].layers[-1]]
 
-# 3. Read image (checking results directory first)
 image_path = (
     "./results/xray.png" if os.path.exists("./results/xray.png") else "xray.png"
 )
@@ -51,11 +50,11 @@ transform = transforms.Compose(
 )
 input_tensor = transform(rgb_img).unsqueeze(0)
 
-# 4. Generate Grad-CAM Heatmap
+
 cam = GradCAM(model=wrapped_model, target_layers=target_layers)
 grayscale_cam = cam(input_tensor=input_tensor, targets=None)[0, :]
 
-# 5. Overlay and Export
+
 img_array = np.float32(rgb_img) / 255.0
 visualization = show_cam_on_image(img_array, grayscale_cam, use_rgb=True)
 
