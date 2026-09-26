@@ -170,8 +170,6 @@ def build_graph() -> StateGraph:
     builder.add_edge("execute_tool", END)
     builder.add_edge("cancelled", END)
 
-    # A checkpointer is required for interrupt()/resume to work at all --
-    # it's what lets the graph "remember" where it paused.
     return builder.compile(checkpointer=MemorySaver())
 
 

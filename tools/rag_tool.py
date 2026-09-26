@@ -1,11 +1,3 @@
-"""
-tools/rag_tool.py
-------------------
-Retrieval over clinical guideline documents, backed by a persisted Chroma
-vector store. Returns plain-text, source-cited results -- suitable both
-for direct display and for passing into an LLM's context (e.g. via
-tools/agent_tools.py), since there's no markup to strip out either way.
-"""
 
 from __future__ import annotations
 

@@ -169,12 +169,12 @@ def classify_image(image_path: str) -> dict[str, Any]:
             "heatmap_path": str(heatmap_path),
         }
 
-    except Exception as exc:  # noqa: BLE001 -- surface any failure to the caller
+    except Exception as exc:
         logger.exception("Classification failed for %s", image_path)
         return {"error": f"Classification failed: {exc}"}
 
 
 if __name__ == "__main__":
-    # Quick manual check: classify whatever sample image is available.
+    
     sample = "./results/xray.png" if Path("./results/xray.png").exists() else "xray.png"
     print(classify_image(sample))

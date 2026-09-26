@@ -1,20 +1,3 @@
-"""
-tools/llm_tool.py
-------------------
-Thin, reusable wrapper around a local Ollama model for clinical Q&A.
-
-The original script only ever ran one hardcoded query and had no error
-handling at all -- if Ollama wasn't running, the model hadn't been pulled
-(`ollama pull llama3.2:1b`), or the connection simply timed out on a cold
-start, it would crash with a raw exception. Since a local model server is
-one of the more fragile parts of a demo to keep running, this version
-assumes that failure mode is the common case, not the exception.
-
-It's also written so it can optionally take retrieved context (e.g. from
-`tools/rag_tool.py`) and synthesize it into a direct answer, rather than
-only ever answering from the model's own training data.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -29,10 +12,7 @@ load_dotenv()
 
 logger = logging.getLogger("clinical_agent.llm_tool")
 
-# --------------------------------------------------------------------------- #
-# Config -- overridable via environment variables so the model/host can
-# change per environment without touching code.
-# --------------------------------------------------------------------------- #
+#
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:1b")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_TEMPERATURE = float(os.getenv("OLLAMA_TEMPERATURE", "0.2"))
