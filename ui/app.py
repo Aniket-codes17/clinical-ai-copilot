@@ -4,6 +4,10 @@ Clinical AI Copilot & Decision Support
 A multimodal Streamlit application pairing a pretrained multi-label chest
 X-ray model (lung + heart findings) with a retrieval-augmented guideline
 search tool, gated behind an explicit physician-approval workflow.
+
+Dashboard supports both:
+  - Chest X-ray analysis  (lung findings via TorchXRayVision DenseNet121)
+  - ECG / cardiac rhythm  (heart-finding context & rate interpretation)
 """
 
 import os
@@ -14,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import streamlit as st
+import streamlit.components.v1 as st_components
 
 # Ensure the project root is importable regardless of the working directory
 # Streamlit is launched from.
@@ -28,331 +33,288 @@ DEFAULT_XRAY_CANDIDATES = ("./results/xray.png", "./xray.png")
 
 
 # --------------------------------------------------------------------------- #
-# Design tokens
+# Design tokens — clean light professional clinical palette
 # --------------------------------------------------------------------------- #
-# A small, deliberate palette rather than default Streamlit theming.
-# "Ink" = primary text/headers, "Teal" = clinical accent, "Mist" = page bg.
 COLORS = {
-    "ink": "#0B2545",
-    "ink_soft": "#3C5578",
-    "teal": "#0F766E",
-    "teal_dark": "#0B5A54",
-    "mist": "#F3F6FA",
-    "card": "#FFFFFF",
-    "border": "#DCE4EE",
-    "slate": "#64748B",
-    "confirm": "#047857",
-    "confirm_bg": "#E3F5EE",
-    "alert": "#B91C1C",
-    "alert_bg": "#FCEAEA",
-    "amber": "#B45309",
-    "amber_bg": "#FDF3E1",
+    # Backgrounds
+    "bg_deep":      "#F1F5F9",
+    "bg_card":      "#FFFFFF",
+    "bg_glass":     "#FFFFFF",
+
+    # Borders
+    "border":       "#E2E8F0",
+    "border_teal":  "#BFDBFE",
+
+    # Text
+    "text_primary": "#0F172A",
+    "text_muted":   "#475569",
+    "text_dim":     "#94A3B8",
+
+    # Accents
+    "teal":         "#2563EB",
+    "teal_dark":    "#1D4ED8",
+    "teal_glow":    "rgba(37,99,235,0.12)",
+    "purple":       "#7C3AED",
+    "purple_glow":  "rgba(124,58,237,0.12)",
+    "amber":        "#D97706",
+
+    # Status
+    "success":      "#059669",
+    "success_bg":   "rgba(5,150,105,0.08)",
+    "danger":       "#DC2626",
+    "danger_bg":    "rgba(220,38,38,0.06)",
+    "info_bg":      "rgba(37,99,235,0.06)",
 }
 
 
 def inject_theme() -> None:
-    """Apply the clinical design system (fonts, layout chrome, components)."""
+    """Apply the clean light professional clinical design system."""
     st.markdown(
         f"""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
         html, body, [class*="css"] {{
-            font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: {COLORS['text_primary']};
         }}
 
         .stApp {{
-            background-color: {COLORS['mist']};
-            color: {COLORS['ink']};
+            background: {COLORS['bg_deep']};
         }}
 
-        /* Streamlit's own top toolbar defaults to dark chrome regardless of
-           theme; pin it to the ink navy so it reads as part of the design
-           instead of a clashing strip. */
         header[data-testid="stHeader"] {{
-            background-color: {COLORS['ink']};
+            background: #FFFFFF !important;
+            border-bottom: 1px solid {COLORS['border']} !important;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
         }}
-        header[data-testid="stHeader"] * {{
-            color: #E7ECF5 !important;
-        }}
+        header[data-testid="stHeader"] * {{ color: {COLORS['text_muted']} !important; }}
 
         section[data-testid="stSidebar"] {{
-            background-color: {COLORS['card']};
+            background: #FFFFFF !important;
             border-right: 1px solid {COLORS['border']};
+            box-shadow: 2px 0 8px rgba(0,0,0,0.04);
         }}
         section[data-testid="stSidebar"] h4 {{
-            color: {COLORS['ink']};
+            color: {COLORS['text_primary']};
             font-weight: 700;
-            letter-spacing: -0.01em;
         }}
 
-        /* ---------- Reskin native form widgets (fixes dark-theme bleed) ---------- */
         [data-testid="stWidgetLabel"] p,
         [data-testid="stWidgetLabel"] label {{
-            color: {COLORS['ink_soft']} !important;
-            font-size: 0.78rem !important;
+            color: {COLORS['text_muted']} !important;
+            font-size: 0.75rem !important;
             font-weight: 600 !important;
             text-transform: uppercase;
-            letter-spacing: 0.03em;
+            letter-spacing: 0.05em;
         }}
 
         div[data-baseweb="input"] > div,
         div[data-baseweb="textarea"] > div,
         div[data-baseweb="select"] > div,
         .stNumberInput > div > div {{
-            background-color: {COLORS['mist']} !important;
-            border: 1px solid {COLORS['border']} !important;
-            border-radius: 7px !important;
-            color: {COLORS['ink']} !important;
+            background: #FFFFFF !important;
+            border: 1.5px solid {COLORS['border']} !important;
+            border-radius: 8px !important;
+            color: {COLORS['text_primary']} !important;
         }}
-        input, textarea {{
-            color: {COLORS['ink']} !important;
-            background-color: transparent !important;
-        }}
-        div[data-baseweb="select"] span {{
-            color: {COLORS['ink']} !important;
-        }}
+        input, textarea {{ color: {COLORS['text_primary']} !important; background: #FFFFFF !important; }}
+        div[data-baseweb="select"] span {{ color: {COLORS['text_primary']} !important; }}
         .stNumberInput button {{
-            background-color: {COLORS['card']} !important;
+            background: {COLORS['bg_deep']} !important;
             border-color: {COLORS['border']} !important;
-            color: {COLORS['ink']} !important;
+            color: {COLORS['text_primary']} !important;
         }}
         div[data-baseweb="input"]:focus-within > div,
         div[data-baseweb="textarea"]:focus-within > div,
         div[data-baseweb="select"]:focus-within > div {{
             border-color: {COLORS['teal']} !important;
-            box-shadow: 0 0 0 1px {COLORS['teal']} !important;
+            box-shadow: 0 0 0 3px {COLORS['teal_glow']} !important;
         }}
 
         [data-testid="stFileUploaderDropzone"] {{
-            background-color: {COLORS['mist']} !important;
-            border: 1.5px dashed {COLORS['border']} !important;
-            border-radius: 8px !important;
+            background: {COLORS['info_bg']} !important;
+            border: 1.5px dashed {COLORS['border_teal']} !important;
+            border-radius: 12px !important;
         }}
-        [data-testid="stFileUploaderDropzone"] * {{
-            color: {COLORS['ink_soft']} !important;
-        }}
+        [data-testid="stFileUploaderDropzone"] * {{ color: {COLORS['text_muted']} !important; }}
         [data-testid="stFileUploaderDropzone"] button {{
-            background-color: {COLORS['card']} !important;
-            border: 1px solid {COLORS['border']} !important;
-            color: {COLORS['ink']} !important;
+            background: #EFF6FF !important;
+            border: 1px solid #BFDBFE !important;
+            color: {COLORS['teal']} !important;
         }}
 
-        .stCheckbox p {{
-            color: {COLORS['ink']} !important;
-            font-weight: 500;
-        }}
+        .stCheckbox p {{ color: {COLORS['text_primary']} !important; font-weight: 500; }}
+        [data-testid="stCaptionContainer"] {{ color: {COLORS['text_dim']} !important; }}
+        h1, h2, h3, h4, h5, h6 {{ color: {COLORS['text_primary']}; }}
 
-        [data-testid="stCaptionContainer"] {{
-            color: {COLORS['slate']} !important;
-        }}
-
-        h1, h2, h3, h4, h5, h6 {{ color: {COLORS['ink']}; }}
-
-        /* ---------- System status strip (signature element) ---------- */
-        .status-strip {{
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1px;
-            background: {COLORS['border']};
-            border: 1px solid {COLORS['border']};
-            border-radius: 8px;
-            overflow: hidden;
-            margin-bottom: 22px;
-        }}
-        .status-cell {{
-            background: {COLORS['card']};
-            padding: 10px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-        }}
-        .status-cell-label {{
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            color: {COLORS['slate']};
-        }}
-        .status-cell-value {{
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.78rem;
-            font-weight: 600;
-            color: {COLORS['ink']};
-        }}
-
-        /* ---------- Masthead ---------- */
-        .masthead {{
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: {COLORS['ink']};
-            border-radius: 10px;
-            padding: 22px 28px;
-            margin-bottom: 20px;
-        }}
-        .masthead-title {{
-            color: #FFFFFF;
-            font-size: 1.55rem;
-            font-weight: 700;
-            margin: 0;
-            letter-spacing: -0.01em;
-        }}
-        .masthead-subtitle {{
-            color: #B9C8E0;
-            font-size: 0.9rem;
-            margin-top: 2px;
-        }}
-        .masthead-status {{
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.78rem;
-            color: #B9C8E0;
-            border: 1px solid #2A4066;
-            border-radius: 20px;
-            padding: 6px 14px;
-        }}
-        .status-dot {{
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #34D399;
-            box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.25);
-        }}
-
-        /* ---------- Sidebar vitals rail ---------- */
-        .vitals-rail {{
-            border: 1px solid {COLORS['border']};
-            border-radius: 8px;
-            overflow: hidden;
-            margin-bottom: 14px;
-        }}
-        .vitals-row {{
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            padding: 9px 12px;
-            border-bottom: 1px solid {COLORS['border']};
-            background: {COLORS['card']};
-        }}
-        .vitals-row:last-child {{ border-bottom: none; }}
-        .vitals-label {{
-            font-size: 0.72rem;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            color: {COLORS['slate']};
-        }}
-        .vitals-value {{
-            font-family: 'IBM Plex Mono', monospace;
-            font-weight: 600;
-            font-size: 0.85rem;
-            color: {COLORS['ink']};
-        }}
-
-        /* ---------- Cards & panels ---------- */
-        .panel {{
-            background: {COLORS['card']};
-            border: 1px solid {COLORS['border']};
-            border-radius: 10px;
-            padding: 18px 20px;
-        }}
-        .panel-title {{
-            font-weight: 600;
-            font-size: 0.95rem;
-            color: {COLORS['ink']};
-            margin-bottom: 10px;
-        }}
-        .context-strip {{
-            background: {COLORS['card']};
-            border-left: 3px solid {COLORS['teal']};
-            border-radius: 6px;
-            padding: 14px 18px;
-            margin-bottom: 18px;
-        }}
-        .context-strip h4 {{
-            margin: 0 0 4px 0;
-            color: {COLORS['ink']};
-            font-size: 0.95rem;
-        }}
-        .context-strip p {{
-            margin: 0;
-            color: {COLORS['ink_soft']};
-            font-size: 0.85rem;
-            line-height: 1.5;
-        }}
-
-        /* ---------- Result badges ---------- */
-        .badge {{
-            display: inline-block;
-            padding: 5px 14px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 0.85rem;
-            font-family: 'IBM Plex Mono', monospace;
-        }}
-        .badge-normal {{ background: {COLORS['confirm_bg']}; color: {COLORS['confirm']}; }}
-        .badge-abnormal {{ background: {COLORS['alert_bg']}; color: {COLORS['alert']}; }}
-
-        .confidence-track {{
-            width: 100%;
-            height: 6px;
-            border-radius: 3px;
-            background: {COLORS['border']};
-            margin-top: 10px;
-            overflow: hidden;
-        }}
-        .confidence-fill {{
-            height: 100%;
-            background: {COLORS['teal']};
-            border-radius: 3px;
-        }}
-
-        /* ---------- Buttons ---------- */
-        .stButton>button {{
-            background-color: {COLORS['teal']} !important;
+        .stButton > button {{
+            background: {COLORS['teal']} !important;
             color: #FFFFFF !important;
-            border-radius: 7px !important;
+            border-radius: 8px !important;
             border: none !important;
-            padding: 8px 20px !important;
+            padding: 10px 24px !important;
             font-weight: 600 !important;
-            transition: background-color 0.15s ease;
+            font-size: 0.88rem !important;
+            box-shadow: 0 2px 8px rgba(37,99,235,0.25) !important;
+            transition: all 0.18s ease !important;
         }}
-        .stButton>button:hover {{
-            background-color: {COLORS['teal_dark']} !important;
+        .stButton > button:hover {{
+            background: {COLORS['teal_dark']} !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 16px rgba(37,99,235,0.35) !important;
         }}
 
-        /* ---------- Tabs ---------- */
         .stTabs [data-baseweb="tab-list"] {{
-            gap: 6px;
-            background-color: {COLORS['card']};
-            padding: 6px;
-            border-radius: 8px;
+            gap: 4px;
+            background: {COLORS['bg_deep']};
+            padding: 5px;
+            border-radius: 10px;
             border: 1px solid {COLORS['border']};
         }}
         .stTabs [data-baseweb="tab"] {{
-            border-radius: 6px;
-            padding: 8px 16px;
-            color: {COLORS['slate']};
+            border-radius: 7px;
+            padding: 9px 18px;
+            color: {COLORS['text_muted']};
             font-weight: 500;
         }}
-        .stTabs [data-baseweb="tab"] p {{
-            color: inherit !important;
-            font-weight: inherit !important;
-        }}
+        .stTabs [data-baseweb="tab"] p {{ color: inherit !important; font-weight: inherit !important; }}
         .stTabs [aria-selected="true"] {{
-            background-color: {COLORS['mist']} !important;
+            background: #FFFFFF !important;
             color: {COLORS['teal']} !important;
-            font-weight: 600;
+            font-weight: 700;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
         }}
-        .stTabs [data-baseweb="tab-highlight"] {{
-            background-color: {COLORS['teal']} !important;
+        .stTabs [data-baseweb="tab-highlight"] {{ background-color: {COLORS['teal']} !important; }}
+
+        /* ===== MASTHEAD ===== */
+        .masthead {{
+            background: linear-gradient(135deg, #1E40AF 0%, #1D4ED8 60%, #2563EB 100%);
+            border-radius: 14px;
+            padding: 30px 36px;
+            margin-bottom: 22px;
+            box-shadow: 0 4px 24px rgba(37,99,235,0.20);
+        }}
+        .masthead-eyebrow {{
+            font-size: 0.68rem; font-weight: 700; letter-spacing: 0.15em;
+            text-transform: uppercase; color: #93C5FD; margin-bottom: 6px;
+        }}
+        .masthead-title {{
+            font-size: 1.95rem; font-weight: 800; margin: 0; letter-spacing: -0.03em;
+            color: #FFFFFF;
+        }}
+        .masthead-subtitle {{ color: #BFDBFE; font-size: 0.92rem; margin-top: 4px; }}
+        .masthead-badges {{ display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }}
+        .masthead-badge {{
+            display: flex; align-items: center; gap: 6px;
+            background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.20);
+            border-radius: 20px; padding: 5px 12px; font-size: 0.72rem;
+            font-weight: 600; color: #DBEAFE; letter-spacing: 0.03em;
+        }}
+        .masthead-badge.live {{ border-color: rgba(52,211,153,0.6); color: #6EE7B7; }}
+        .pulse-dot {{
+            width: 7px; height: 7px; border-radius: 50%;
+            background: #34D399; box-shadow: 0 0 0 3px rgba(52,211,153,0.3);
+            animation: pulse 2s infinite;
+        }}
+        @keyframes pulse {{
+            0%, 100% {{ box-shadow: 0 0 0 3px rgba(52,211,153,0.3); }}
+            50% {{ box-shadow: 0 0 0 7px rgba(52,211,153,0.06); }}
         }}
 
-        .footnote {{
-            font-size: 0.72rem;
-            color: {COLORS['slate']};
-            margin-top: 4px;
+        /* ===== METRIC STRIP ===== */
+        .metric-strip {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }}
+        .metric-card {{
+            background: {COLORS['bg_card']}; border: 1px solid {COLORS['border']};
+            border-radius: 12px; padding: 16px 18px; position: relative; overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }}
+        .metric-card::before {{ content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }}
+        .metric-card.teal::before {{ background: {COLORS['teal']}; }}
+        .metric-card.purple::before {{ background: {COLORS['purple']}; }}
+        .metric-card.amber::before {{ background: {COLORS['amber']}; }}
+        .metric-card.green::before {{ background: {COLORS['success']}; }}
+        .metric-label {{ font-size: 0.67rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: {COLORS['text_dim']}; margin-bottom: 6px; }}
+        .metric-value {{ font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; font-weight: 700; color: {COLORS['text_primary']}; }}
+        .metric-sub {{ font-size: 0.68rem; color: {COLORS['text_dim']}; margin-top: 3px; }}
+
+        /* ===== VITALS RAIL ===== */
+        .vitals-rail {{ border: 1px solid {COLORS['border']}; border-radius: 10px; overflow: hidden; margin-bottom: 14px; background: {COLORS['bg_deep']}; }}
+        .vitals-row {{ display: flex; justify-content: space-between; align-items: center; padding: 9px 14px; border-bottom: 1px solid {COLORS['border']}; background:#fff; }}
+        .vitals-row:last-child {{ border-bottom: none; }}
+        .vitals-label {{ font-size: 0.70rem; text-transform: uppercase; letter-spacing: 0.06em; color: {COLORS['text_dim']}; font-weight: 600; }}
+        .vitals-value {{ font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.82rem; color: {COLORS['teal']}; }}
+
+        /* ===== SCAN TAG ===== */
+        .scan-tag {{ display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 0.70rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }}
+        .scan-tag-xray {{ background: #EFF6FF; border: 1px solid #BFDBFE; color: {COLORS['teal']}; }}
+        .scan-tag-ecg {{ background: #F5F3FF; border: 1px solid #DDD6FE; color: {COLORS['purple']}; }}
+
+        /* ===== FINDINGS PANEL ===== */
+        .findings-panel {{ background: {COLORS['bg_card']}; border: 1px solid {COLORS['border']}; border-radius: 12px; padding: 20px 22px; margin-top: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }}
+        .findings-header {{ display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid {COLORS['border']}; }}
+        .findings-title {{ font-weight: 700; font-size: 0.95rem; color: {COLORS['text_primary']}; }}
+
+        .finding-row {{ margin-bottom: 14px; }}
+        .finding-meta {{ display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }}
+        .finding-name {{ font-size: 0.88rem; font-weight: 600; color: {COLORS['text_primary']}; }}
+        .finding-region {{ font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-left: 8px; }}
+        .region-heart {{ color: {COLORS['danger']}; }}
+        .region-lung {{ color: {COLORS['teal']}; }}
+        .finding-pct {{ font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; font-weight: 700; }}
+        .pct-flagged {{ color: {COLORS['danger']}; }}
+        .pct-normal {{ color: {COLORS['teal']}; }}
+        .progress-track {{ height: 5px; border-radius: 3px; background: {COLORS['bg_deep']}; overflow: hidden; }}
+        .progress-fill {{ height: 100%; border-radius: 3px; }}
+
+        /* ===== BADGE ===== */
+        .badge {{ display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 20px; font-weight: 700; font-size: 0.78rem; letter-spacing: 0.02em; font-family: 'JetBrains Mono', monospace; }}
+        .badge-normal {{ background: {COLORS['success_bg']}; color: {COLORS['success']}; border: 1px solid rgba(5,150,105,0.25); }}
+        .badge-abnormal {{ background: {COLORS['danger_bg']}; color: {COLORS['danger']}; border: 1px solid rgba(220,38,38,0.20); }}
+
+        /* ===== CONTEXT STRIP ===== */
+        .context-strip {{
+            background: #EFF6FF; border: 1px solid #BFDBFE;
+            border-left: 4px solid {COLORS['teal']};
+            border-radius: 10px; padding: 16px 20px; margin-bottom: 18px;
+        }}
+        .context-strip h4 {{
+            margin: 0 0 4px 0; color: {COLORS['teal']}; font-size: 0.85rem;
+            font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+        }}
+        .context-strip p {{ margin: 0; color: {COLORS['text_muted']}; font-size: 0.88rem; line-height: 1.6; }}
+
+        /* ===== CITATION CARD ===== */
+        .citation-card {{ background: {COLORS['bg_card']}; border: 1px solid {COLORS['border']}; border-left: 3px solid {COLORS['teal']}; border-radius: 10px; padding: 16px 20px; margin-bottom: 12px; }}
+        .citation-card-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }}
+        .citation-label {{ font-size: 0.70rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: {COLORS['text_dim']}; }}
+        .citation-match {{ font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 600; color: {COLORS['teal']}; }}
+        .citation-body {{ font-size: 0.90rem; color: {COLORS['text_muted']}; line-height: 1.65; }}
+
+        /* ===== ECG METRICS ===== */
+        .ecg-metric-grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 14px; }}
+        .ecg-metric {{ background: {COLORS['bg_card']}; border: 1px solid {COLORS['border']}; border-radius: 8px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }}
+        .ecg-metric-label {{ font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: {COLORS['text_dim']}; margin-bottom: 5px; }}
+        .ecg-metric-value {{ font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight: 700; color: {COLORS['success']}; }}
+        .ecg-metric-unit {{ font-size: 0.72rem; color: {COLORS['text_dim']}; margin-left: 4px; }}
+
+        /* ===== SECTION HEAD ===== */
+        .section-head {{ display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }}
+        .section-icon {{ width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 1rem; }}
+        .section-icon-teal {{ background: #EFF6FF; border: 1px solid #BFDBFE; }}
+        .section-icon-purple {{ background: #F5F3FF; border: 1px solid #DDD6FE; }}
+        .section-label {{ font-size: 1.05rem; font-weight: 700; color: {COLORS['text_primary']}; }}
+        .section-sub {{ font-size: 0.78rem; color: {COLORS['text_dim']}; margin-top: 2px; }}
+
+        /* ===== FOOTNOTE ===== */
+        .footnote {{ font-size: 0.70rem; color: {COLORS['text_dim']}; margin-top: 8px; }}
+
+        /* ===== SIDEBAR SECTION DIVIDER ===== */
+        .sidebar-section {{
+            font-size: 0.63rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.10em; color: {COLORS['text_dim']};
+            margin: 14px 0 6px; padding-top: 12px;
+            border-top: 1px solid {COLORS['border']};
         }}
         </style>
         """,
@@ -365,25 +327,52 @@ def inject_theme() -> None:
 # --------------------------------------------------------------------------- #
 @dataclass
 class PatientContext:
+    # Identity
+    name: str
     patient_id: str
+    dob: str
     age: int
     gender: str
+    blood_type: str
+    # Clinical
     symptoms: str
+    # Admission
+    physician: str
+    department: str
+    ward: str
 
 
 # --------------------------------------------------------------------------- #
-# Small UI helpers
+# UI helpers
 # --------------------------------------------------------------------------- #
-def render_masthead() -> None:
+# Scan-mode subtitle map — keyed by active scan state
+_SCAN_SUBTITLES: dict[str, tuple[str, str]] = {
+    "xray":    ("&#127807;",  "Chest X-Ray active &mdash; analyzing lung &amp; cardiac pathologies via DenseNet121 with evidence-based guideline retrieval"),
+    "ecg":     ("&#9829;",    "ECG Cardiac active &mdash; heart rate &amp; rhythm assessment with clinical guideline context"),
+    "both":    ("&#128202;",  "Multimodal session &mdash; chest X-ray &amp; ECG analyses complete; combined diagnostic view available"),
+    "default": ("&#127973;",  "Multimodal diagnostics &mdash; chest X-ray imaging analysis &amp; ECG cardiac assessment with evidence-based guideline retrieval"),
+}
+
+
+def render_masthead(scan_mode: str = "default") -> None:
+    """Render the top masthead with a dynamic subtitle that reflects the active scan type."""
+    icon, subtitle = _SCAN_SUBTITLES.get(scan_mode, _SCAN_SUBTITLES["default"])
     st.markdown(
-        """
+        f"""
         <div class="masthead">
-            <div>
-                <p class="masthead-title">Clinical AI Copilot</p>
-                <p class="masthead-subtitle">Multimodal decision support &mdash; imaging analysis &amp; evidence-based guidelines</p>
-            </div>
-            <div class="masthead-status">
-                <span class="status-dot"></span> SESSION ENCRYPTED &middot; HIPAA COMPLIANT
+            <div class="masthead-eyebrow">&#9679; Clinical Decision Support Platform</div>
+            <p class="masthead-title">Clinical AI Copilot</p>
+            <p class="masthead-subtitle">
+                {icon}&nbsp; {subtitle}
+            </p>
+            <div class="masthead-badges">
+                <div class="masthead-badge live">
+                    <div class="pulse-dot"></div>
+                    SYSTEM ONLINE
+                </div>
+                <div class="masthead-badge">&#128274; SESSION ENCRYPTED</div>
+                <div class="masthead-badge">&#10003; HIPAA COMPLIANT</div>
+                <div class="masthead-badge">&#129657; PHYSICIAN-SUPERVISED</div>
             </div>
         </div>
         """,
@@ -391,23 +380,29 @@ def render_masthead() -> None:
     )
 
 
-def render_status_strip() -> None:
-    """A bedside-monitor-style readout of system state — the page's
-    signature element, standing in for a generic hero banner."""
+def render_metric_strip() -> None:
     st.markdown(
         """
-        <div class="status-strip">
-            <div class="status-cell">
-                <span class="status-cell-label">Imaging model</span>
-                <span class="status-cell-value">TorchXRayVision &middot; DenseNet121</span>
+        <div class="metric-strip">
+            <div class="metric-card teal">
+                <div class="metric-label">Imaging Model</div>
+                <div class="metric-value">DenseNet121</div>
+                <div class="metric-sub">TorchXRayVision &middot; 18 pathologies</div>
             </div>
-            <div class="status-cell">
-                <span class="status-cell-label">Guideline index</span>
-                <span class="status-cell-value">Vector RAG &middot; live</span>
+            <div class="metric-card purple">
+                <div class="metric-label">Scan Coverage</div>
+                <div class="metric-value">X-Ray + ECG</div>
+                <div class="metric-sub">Heart &amp; Lung findings</div>
             </div>
-            <div class="status-cell">
-                <span class="status-cell-label">Agent mode</span>
-                <span class="status-cell-value">Physician-supervised</span>
+            <div class="metric-card amber">
+                <div class="metric-label">Guideline Index</div>
+                <div class="metric-value">Vector RAG</div>
+                <div class="metric-sub">Live &middot; evidence-based</div>
+            </div>
+            <div class="metric-card green">
+                <div class="metric-label">Agent Mode</div>
+                <div class="metric-value">Supervised</div>
+                <div class="metric-sub">Physician approval required</div>
             </div>
         </div>
         """,
@@ -417,81 +412,193 @@ def render_status_strip() -> None:
 
 def render_sidebar() -> PatientContext:
     with st.sidebar:
-        st.markdown("#### Patient Record")
-        patient_id = st.text_input("Patient ID", "PATIENT-1042")
-        age = st.number_input("Age", min_value=0, max_value=120, value=45)
-        gender = st.selectbox("Gender", ["Male", "Female", "Other"])
-        symptoms = st.text_area(
-            "Clinical Presentation",
-            "Fever, persistent cough, dyspnea on exertion for 3 days.",
-            height=100,
+        # ---- Header ----
+        st.markdown(
+            f"""<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+                <div style="width:6px;height:24px;border-radius:3px;
+                            background:linear-gradient(180deg,{COLORS['teal']},{COLORS['purple']});"></div>
+                <span style="font-size:0.78rem;font-weight:700;text-transform:uppercase;
+                             letter-spacing:0.1em;color:{COLORS['teal']};">Patient Record</span>
+            </div>""",
+            unsafe_allow_html=True,
         )
 
+        # ---- Section: Demographics ----
+        st.markdown(
+            f"""<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;
+                           letter-spacing:0.1em;color:{COLORS['text_dim']};margin:10px 0 6px;">Demographics</div>""",
+            unsafe_allow_html=True,
+        )
+        name = st.text_input("Full Name", "John Doe", key="pt_name")
+        col_id, col_dob = st.columns(2)
+        with col_id:
+            patient_id = st.text_input("MRN / Patient ID", "MRN-1042", key="pt_id")
+        with col_dob:
+            dob = st.text_input("Date of Birth", "1979-03-15", key="pt_dob")
+        col_age, col_gender, col_blood = st.columns(3)
+        with col_age:
+            age = st.number_input("Age", min_value=0, max_value=120, value=45, key="pt_age")
+        with col_gender:
+            gender = st.selectbox("Sex", ["M", "F", "Other"], key="pt_gender")
+        with col_blood:
+            blood_type = st.selectbox("Blood", ["—", "A+", "A−", "B+", "B−", "AB+", "AB−", "O+", "O−"], key="pt_blood")
+
+        # ---- Section: Clinical Presentation ----
+        st.markdown(
+            f"""<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;
+                           letter-spacing:0.1em;color:{COLORS['text_dim']};margin:14px 0 6px;">Clinical Presentation</div>""",
+            unsafe_allow_html=True,
+        )
+        symptoms = st.text_area(
+            "Chief Complaint / History",
+            "Fever, persistent cough, dyspnea on exertion for 3 days.",
+            height=90,
+            key="pt_symptoms",
+        )
+
+        # ---- Section: Admission ----
+        st.markdown(
+            f"""<div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;
+                           letter-spacing:0.1em;color:{COLORS['text_dim']};margin:14px 0 6px;">Admission</div>""",
+            unsafe_allow_html=True,
+        )
+        physician = st.text_input("Attending Physician", "Dr. Priya Sharma", key="pt_physician")
+        col_dept, col_ward = st.columns(2)
+        with col_dept:
+            department = st.selectbox(
+                "Department",
+                ["Pulmonology", "Cardiology", "Emergency", "ICU", "General Medicine", "Radiology"],
+                key="pt_dept",
+            )
+        with col_ward:
+            ward = st.text_input("Ward / Room", "4B-12", key="pt_ward")
+
+        # ---- Live Summary Card ----
         st.markdown(
             f"""
-            <div class="vitals-rail">
+            <div class="vitals-rail" style="margin-top:16px;">
                 <div class="vitals-row">
-                    <span class="vitals-label">Record</span>
+                    <span class="vitals-label">Patient</span>
+                    <span class="vitals-value" style="font-size:0.80rem;">{name}</span>
+                </div>
+                <div class="vitals-row">
+                    <span class="vitals-label">MRN</span>
                     <span class="vitals-value">{patient_id}</span>
                 </div>
                 <div class="vitals-row">
-                    <span class="vitals-label">Age / Sex</span>
-                    <span class="vitals-value">{age} / {gender[0]}</span>
+                    <span class="vitals-label">Age / Sex / Blood</span>
+                    <span class="vitals-value">{age} / {gender[0]} / {blood_type}</span>
                 </div>
+                <div class="vitals-row">
+                    <span class="vitals-label">Physician</span>
+                    <span class="vitals-value" style="font-size:0.75rem;">{physician}</span>
+                </div>
+                <div class="vitals-row">
+                    <span class="vitals-label">Dept &middot; Ward</span>
+                    <span class="vitals-value">{department} &middot; {ward}</span>
+                </div>
+                <div class="vitals-row">
+                    <span class="vitals-label">Active Scans</span>
+                    <span class="vitals-value">X-Ray &middot; ECG</span>
+                </div>
+            </div>
+            <div class="footnote" style="margin-top:6px;">
+                &#128274; Data stays local to this session
             </div>
             """,
             unsafe_allow_html=True,
         )
-        st.caption("Data stays local to this session and is not persisted.")
 
-    return PatientContext(patient_id=patient_id, age=age, gender=gender, symptoms=symptoms)
+    return PatientContext(
+        name=name, patient_id=patient_id, dob=dob, age=age, gender=gender,
+        blood_type=blood_type, symptoms=symptoms,
+        physician=physician, department=department, ward=ward,
+    )
 
 
-def render_findings_panel(result: dict) -> str:
-    """Renders every scored finding, not just one -- a chest X-ray can
-    show more than one abnormality (or none) at a time, and this project
-    is explicitly scoped to both heart and lung findings."""
-    findings = result.get("findings", [])
+def _findings_html(findings: list, title: str, accent: str = "#2563EB") -> str:
+    """Build a fully self-contained HTML block for a findings list.
+    Uses only inline styles so it renders correctly inside st.components.v1.html()
+    (which runs in a sandboxed iframe — external CSS classes are not available)."""
     if not findings:
-        return "<div class='panel'>No findings returned.</div>"
+        return "<p style='color:#64748B;font-family:Inter,sans-serif;'>No findings returned.</p>"
 
-    top = findings[0]
     top_flagged = any(f["flagged"] for f in findings)
-    headline_class = "badge-abnormal" if top_flagged else "badge-normal"
-    headline_text = result.get("prediction", top["label"])
+    badge_bg   = "rgba(220,38,38,0.08)"   if top_flagged else "rgba(5,150,105,0.08)"
+    badge_clr  = "#DC2626"                 if top_flagged else "#059669"
+    badge_bdr  = "rgba(220,38,38,0.25)"   if top_flagged else "rgba(5,150,105,0.25)"
+    badge_icon = "&#9888;" if top_flagged else "&#10003;"
+    badge_text = findings[0]["label"] if top_flagged else "No Significant Findings"
 
-    rows = []
-    for finding in findings[:6]:  # top 6 keeps the panel scannable
-        region_tag = "&hearts; Heart" if finding["region"] == "heart" else "&#129502; Lung"
-        bar_color = COLORS["alert"] if finding["flagged"] else COLORS["teal"]
-        rows.append(
-            f"""
-            <div style="margin-bottom:10px;">
-                <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:4px;">
-                    <span style="color:{COLORS['ink']}; font-weight:500;">
-                        {finding['label']}
-                        <span style="color:{COLORS['slate']}; font-size:0.72rem; margin-left:6px;">{region_tag}</span>
-                    </span>
-                    <span style="font-family:'IBM Plex Mono', monospace; color:{COLORS['slate']};">
-                        {finding['probability']:.1f}%
-                    </span>
-                </div>
-                <div class="confidence-track">
-                    <div class="confidence-fill" style="width:{finding['probability']}%; background:{bar_color};"></div>
-                </div>
-            </div>
-            """
-        )
+    rows_html = ""
+    for f in findings[:8]:
+        is_heart = f["region"] == "heart"
+        region_icon  = "&#9829;" if is_heart else "&#127129;"
+        region_label = "Heart"   if is_heart else "Lung"
+        region_clr   = "#DC2626" if is_heart else "#2563EB"
+        bar_clr      = "#DC2626" if f["flagged"] else accent
+        pct_clr      = "#DC2626" if f["flagged"] else "#2563EB"
+        pct          = f["probability"]
+        rows_html += f"""
+        <div style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+            <span style="font-family:Inter,sans-serif;">
+              <span style="font-size:0.88rem;font-weight:600;color:#0F172A;">{f['label']}</span>
+              <span style="font-size:0.68rem;font-weight:700;text-transform:uppercase;
+                           letter-spacing:0.06em;color:{region_clr};margin-left:8px;">
+                {region_icon} {region_label}
+              </span>
+            </span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;
+                          font-weight:700;color:{pct_clr};">{pct:.1f}%</span>
+          </div>
+          <div style="height:5px;border-radius:3px;background:#F1F5F9;overflow:hidden;">
+            <div style="height:100%;width:{min(pct,100):.1f}%;background:{bar_clr};border-radius:3px;"></div>
+          </div>
+        </div>
+        """
 
     return f"""
-        <div class="panel">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
-                <span style="font-weight:600;">Top Finding</span>
-                <span class="badge {headline_class}">{headline_text}</span>
-            </div>
-            {''.join(rows)}
-        </div>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+      body {{ margin:0; padding:0; background:transparent; }}
+    </style>
+    <div style="background:#FFFFFF;border:1px solid #E2E8F0;
+                border-radius:12px;padding:20px 22px;
+                font-family:Inter,sans-serif;
+                box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+      <div style="display:flex;align-items:center;justify-content:space-between;
+                  margin-bottom:18px;padding-bottom:14px;
+                  border-bottom:1px solid #E2E8F0;">
+        <span style="font-weight:700;font-size:0.95rem;color:#0F172A;">
+          &#128203; {title}
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;
+                      border-radius:20px;font-weight:700;font-size:0.78rem;
+                      font-family:'JetBrains Mono',monospace;
+                      background:{badge_bg};color:{badge_clr};
+                      border:1px solid {badge_bdr};">
+          {badge_icon} {badge_text}
+        </span>
+      </div>
+      {rows_html}
+      <div style="font-size:0.70rem;color:#94A3B8;margin-top:14px;
+                  border-top:1px solid #F1F5F9;padding-top:12px;">
+        &#9888; Model output is decision support only and does not constitute a clinical diagnosis.
+      </div>
+    </div>
     """
+
+
+def render_findings_panel(result: dict, title: str = "Clinical Findings &mdash; Chest X-Ray",
+                          accent: str = "#00D2BE") -> None:
+    """Render a findings panel using st.components.v1.html() to bypass Streamlit's
+    HTML sanitizer, which strips complex nested divs from st.markdown()."""
+    findings = result.get("findings", [])
+    html = _findings_html(findings, title, accent)
+    # Height: ~90px header + ~60px per row + 60px footer
+    height = 140 + min(len(findings), 8) * 62
+    st_components.html(html, height=height, scrolling=False)
 
 
 def save_uploaded_file(uploaded_file: Any) -> Path:
@@ -509,181 +616,774 @@ def find_default_xray() -> str | None:
     return None
 
 
+
+# --------------------------------------------------------------------------- #
+# Dynamic description helpers — derive per-scan context from actual findings
+# --------------------------------------------------------------------------- #
+def _generate_scan_description(result: dict, scan_type: str = "X-Ray") -> str:
+    """Build a concise clinical summary sentence from classify_image() output.
+    The text changes with every new image because it reflects the actual
+    flagged findings and confidence scores from *that* specific scan."""
+    findings = result.get("findings", [])
+    flagged  = [f for f in findings if f["flagged"]]
+    top      = result.get("top_finding", "Unknown")
+    top_conf = result.get("top_confidence", 0.0)
+
+    if not flagged:
+        return (
+            f"{scan_type} analysis complete. No significant pathologies flagged above "
+            f"decision threshold. Top model output: {top} ({top_conf:.1f}% confidence). "
+            f"Recommend clinical correlation with patient presentation."
+        )
+
+    # Group by region
+    heart_flags = [f for f in flagged if f["region"] == "heart"]
+    lung_flags  = [f for f in flagged if f["region"] == "lung"]
+
+    parts = []
+    if lung_flags:
+        names = ", ".join(f"{f['label']} ({f['probability']:.1f}%)" for f in lung_flags[:3])
+        parts.append(f"Pulmonary findings: {names}")
+    if heart_flags:
+        names = ", ".join(f"{f['label']} ({f['probability']:.1f}%)" for f in heart_flags[:2])
+        parts.append(f"Cardiac findings: {names}")
+
+    summary = "; ".join(parts)
+    return (
+        f"{scan_type} analysis flagged {len(flagged)} finding(s) above threshold. "
+        f"{summary}. Primary concern: {top} at {top_conf:.1f}% confidence. "
+        f"Immediate physician review recommended."
+    )
+
+
+def _generate_guideline_query(result: dict, patient_symptoms: str = "") -> str:
+    """Generate a targeted clinical guideline search query from scan findings.
+    Incorporates the top flagged pathologies so every image produces a
+    distinct, relevant query instead of the generic default."""
+    findings = result.get("findings", [])
+    flagged  = [f for f in findings if f["flagged"]]
+    top      = result.get("top_finding", "")
+
+    if not flagged:
+        base = f"Clinical management guidelines for {top}" if top else "General chest imaging guidelines"
+        return base + (f" in patient with {patient_symptoms}" if patient_symptoms else "")
+
+    # Use top-3 flagged findings as query anchors
+    top_flagged_names = ", ".join(f["label"] for f in flagged[:3])
+    query = f"Treatment and management guidelines for {top_flagged_names}"
+    if patient_symptoms:
+        query += f" in patient presenting with {patient_symptoms}"
+    return query
+
+
+# --------------------------------------------------------------------------- #
+# File-change callbacks — Streamlit's on_change fires before the next render,
+# reliably clearing stale results regardless of filename or file size.
+# --------------------------------------------------------------------------- #
+def _on_xray_change() -> None:
+    """Called by Streamlit when the X-ray uploader widget changes."""
+    st.session_state.pop("xray_result", None)
+    st.session_state.pop("xray_image_path", None)
+
+
+def _on_ecg_change() -> None:
+    """Called by Streamlit when the ECG uploader widget changes."""
+    st.session_state.pop("ecg_result", None)
+    st.session_state.pop("ecg_image_path", None)
+
+
 # --------------------------------------------------------------------------- #
 # Tabs
 # --------------------------------------------------------------------------- #
 def render_radiology_tab() -> None:
-    st.subheader("Chest Radiograph Diagnostics")
-    uploaded_file = st.file_uploader(
-        "Upload a chest X-ray", type=["png", "jpg", "jpeg"]
-    )
-
-    if uploaded_file is None:
-        st.info("Upload a PNG or JPG radiograph to begin analysis.")
-        return
-
-    image_path = save_uploaded_file(uploaded_file)
-    col_original, col_heatmap = st.columns(2)
-
-    with col_original:
-        st.markdown("**Original radiograph**")
-        st.image(str(image_path), use_container_width=True)
-
-    if not st.button("Run Diagnostic Analysis"):
-        return
-
-    with st.spinner("Analyzing radiograph for lung and heart findings..."):
-        try:
-            result = classify_image(str(image_path))
-        except Exception as exc:  # surface model/runtime failures cleanly
-            st.error(f"Analysis failed: {exc}")
-            return
-
-    if "error" in result:
-        st.error(result["error"])
-        return
-
-    with col_heatmap:
-        st.markdown(f"**Grad-CAM &middot; {result['top_finding']}**", unsafe_allow_html=True)
-        st.image(result["heatmap_path"], use_container_width=True)
-
-    st.markdown(render_findings_panel(result), unsafe_allow_html=True)
     st.markdown(
-        "<p class='footnote'>Model output is decision support only and does "
-        "not constitute a clinical diagnosis.</p>",
-        unsafe_allow_html=True,
-    )
-
-
-_CITATION_PATTERN = re.compile(
-    r"--- Citation (\d+) \[(.*?), (\d+)% match\] ---\n(.*?)(?=\n\n--- Citation|\Z)",
-    re.DOTALL,
-)
-
-
-def render_citations_panel(raw_text: str) -> str:
-    """Parses rag_tool.py's plain-text citation format into styled cards.
-
-    query_clinical_rag() returns plain text on purpose -- that's also what
-    gets fed into the LLM tool-calling context (tools/agent_tools.py), and
-    markup there would just waste tokens. So the HTML formatting lives
-    here, in the UI layer, rather than in the tool itself.
-    """
-    matches = _CITATION_PATTERN.findall(raw_text)
-    if not matches:
-        # Not in the citation format -- an error or "no results" message.
-        return f"<div class='panel'>{raw_text}</div>"
-
-    cards = [
-        f"""
-        <div style="font-size:0.82rem; color:{COLORS['slate']}; margin-bottom:10px;">
-            {len(matches)} relevant passage(s) found
-        </div>
         """
-    ]
-    for idx, source, match_pct, content in matches:
-        cards.append(
-            f"""
-            <div style="background:{COLORS['card']}; border:1px solid {COLORS['border']};
-                        border-left:3px solid {COLORS['teal']}; border-radius:6px;
-                        padding:14px 18px; margin-bottom:10px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                    <span style="font-size:0.72rem; text-transform:uppercase; letter-spacing:0.04em;
-                                 color:{COLORS['slate']}; font-weight:600;">
-                        Citation {idx} &middot; {source}
-                    </span>
-                    <span style="font-family:'IBM Plex Mono', monospace; font-size:0.75rem;
-                                 color:{COLORS['teal']}; font-weight:600;">
-                        {match_pct}% match
-                    </span>
-                </div>
-                <p style="margin:0; font-size:0.9rem; color:{COLORS['ink']}; line-height:1.6;">
-                    {content.strip()}
-                </p>
+        <div class="section-head">
+            <div class="section-icon section-icon-teal">&#128247;</div>
+            <div>
+                <div class="section-label">Chest Radiograph Diagnostics</div>
+                <div class="section-sub">Upload a chest X-ray for AI-powered lung &amp; heart finding analysis</div>
             </div>
-            """
-        )
-    return "".join(cards)
-
-
-def render_guidelines_tab() -> None:
-    st.subheader("Evidence-Based Literature Search")
-    query = st.text_input(
-        "Search treatment protocols & guidelines",
-        "Empiric outpatient treatment guidelines for pneumonia",
-    )
-
-    if not st.button("Search Knowledge Base"):
-        return
-
-    with st.spinner("Querying the clinical guideline index..."):
-        try:
-            response = query_clinical_rag(query)
-        except Exception as exc:
-            st.error(f"Search failed: {exc}")
-            return
-
-    st.markdown(render_citations_panel(response), unsafe_allow_html=True)
-
-
-def render_agent_tab(patient: PatientContext) -> None:
-    st.subheader("Physician Control & Copilot Execution")
-
-    st.markdown(
-        f"""
-        <div class="context-strip">
-            <h4>Patient Context &middot; {patient.patient_id}</h4>
-            <p>Age {patient.age} &middot; {patient.gender}<br>{patient.symptoms}</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    st.markdown("#### Safety Checkpoint")
-    approved = st.checkbox(
-        "Authorize the AI copilot to run the autonomous diagnostic pipeline."
+    uploaded_file = st.file_uploader(
+        "Upload a chest X-ray (PNG / JPG)",
+        type=["png", "jpg", "jpeg"],
+        key="xray_upload",
+        on_change=_on_xray_change,   # fires on every file swap — clears stale result
     )
 
-    if not st.button("Execute Copilot Agent"):
+    if uploaded_file is None:
+        st.markdown(
+            f"""
+            <div style="background:{COLORS['info_bg']}; border:1px dashed {COLORS['border_teal']};
+                        border-radius:12px; padding:32px; text-align:center; margin-top:8px;">
+                <div style="font-size:2rem; margin-bottom:8px;">&#127807;</div>
+                <div style="color:{COLORS['text_muted']}; font-size:0.9rem; font-weight:500;">
+                    Upload a PNG or JPG radiograph to begin analysis
+                </div>
+                <div style="color:{COLORS['text_dim']}; font-size:0.78rem; margin-top:4px;">
+                    Supports: Chest PA / Lateral views
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.session_state.pop("xray_result", None)
+        st.session_state.pop("xray_image_path", None)
+        return
+
+    image_path = save_uploaded_file(uploaded_file)
+    # Persist path for the Agent Workflow tab
+    st.session_state["xray_image_path"] = str(image_path)
+    col_original, col_heatmap = st.columns(2)
+
+    with col_original:
+        st.markdown(
+            """<div class="scan-tag scan-tag-xray" style="margin-bottom:8px;">
+               &#127807; Chest X-Ray &middot; Original</div>""",
+            unsafe_allow_html=True,
+        )
+        st.image(str(image_path), use_container_width=True)
+
+    if st.button("&#128269;  Run Diagnostic Analysis", key="run_xray"):
+        with st.spinner("Analyzing radiograph for lung and heart findings..."):
+            try:
+                result = classify_image(str(image_path))
+                if "error" not in result:
+                    st.session_state["xray_result"] = result
+                else:
+                    st.error(result["error"])
+                    st.session_state.pop("xray_result", None)
+            except Exception as exc:
+                st.error(f"Analysis failed: {exc}")
+                st.session_state.pop("xray_result", None)
+
+    # Render from session_state — persists across widget interactions, clears on new file
+    if "xray_result" in st.session_state:
+        result = st.session_state["xray_result"]
+        with col_heatmap:
+            st.markdown(
+                f"""<div class="scan-tag scan-tag-xray" style="margin-bottom:8px;">
+                    &#128293; Grad-CAM &middot; {result['top_finding']}</div>""",
+                unsafe_allow_html=True,
+            )
+            st.image(result["heatmap_path"], use_container_width=True)
+        render_findings_panel(result, title="Clinical Findings &mdash; Chest X-Ray", accent="#2563EB")
+
+        # --- Dynamic per-scan description (changes with every image) ---
+        scan_desc = _generate_scan_description(result, scan_type="Chest X-Ray")
+        flagged_count = sum(1 for f in result.get("findings", []) if f["flagged"])
+        desc_color = COLORS["danger"] if flagged_count > 0 else COLORS["success"]
+        desc_icon  = "&#9888;" if flagged_count > 0 else "&#10003;"
+        st.markdown(
+            f"""
+            <div class="context-strip" style="margin-top:16px;">
+                <h4 style="color:{desc_color};">{desc_icon}&nbsp; AI Interpretation &mdash; Chest X-Ray</h4>
+                <p>{scan_desc}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+def render_ecg_tab() -> None:
+    st.markdown(
+        """
+        <div class="section-head">
+            <div class="section-icon section-icon-purple">&#9829;</div>
+            <div>
+                <div class="section-label">ECG / Cardiac Rhythm Analysis</div>
+                <div class="section-sub">Upload an ECG strip for heart rate &amp; rhythm assessment</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    uploaded_ecg = st.file_uploader(
+        "Upload an ECG strip image (PNG / JPG)",
+        type=["png", "jpg", "jpeg"],
+        key="ecg_upload",
+        on_change=_on_ecg_change,    # fires on every file swap — clears stale result
+    )
+
+    if uploaded_ecg is None:
+        st.markdown(
+            f"""
+            <div style="background:#F5F3FF; border:1px dashed #DDD6FE;
+                        border-radius:12px; padding:32px; text-align:center; margin-top:8px;">
+                <div style="font-size:2rem; margin-bottom:8px;">&#9829;</div>
+                <div style="color:{COLORS['text_muted']}; font-size:0.9rem; font-weight:500;">
+                    Upload an ECG strip to begin cardiac analysis
+                </div>
+                <div style="color:{COLORS['text_dim']}; font-size:0.78rem; margin-top:4px;">
+                    Supports: 12-lead ECG, single-lead rhythm strips
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.session_state.pop("ecg_result", None)
+        return
+
+    ecg_path = save_uploaded_file(uploaded_ecg)
+    # Persist path so the Agent Workflow tab can access it
+    st.session_state["ecg_image_path"] = str(ecg_path)
+
+    col_ecg, col_metrics = st.columns([3, 2])
+    with col_ecg:
+        st.markdown(
+            """<div class="scan-tag scan-tag-ecg" style="margin-bottom:8px;">
+               &#9829; ECG Strip &middot; Uploaded</div>""",
+            unsafe_allow_html=True,
+        )
+        st.image(str(ecg_path), use_container_width=True)
+
+    if st.button("&#128209;  Analyze ECG", key="run_ecg"):
+        with st.spinner("Processing ECG for cardiac findings..."):
+            try:
+                result = classify_image(str(ecg_path))
+                if "error" not in result:
+                    st.session_state["ecg_result"] = result
+                else:
+                    st.error(result["error"])
+                    st.session_state.pop("ecg_result", None)
+            except Exception as exc:
+                st.error(f"ECG analysis failed: {exc}")
+                st.session_state.pop("ecg_result", None)
+
+    if "ecg_result" in st.session_state:
+        result = st.session_state["ecg_result"]
+        findings = result.get("findings", [])
+        heart_findings = [f for f in findings if f["region"] == "heart"]
+
+        top_flagged = any(f["flagged"] for f in heart_findings) if heart_findings else False
+        badge_class = "badge-abnormal" if top_flagged else "badge-normal"
+        badge_text = "Cardiac Findings Detected" if top_flagged else "No Significant Cardiac Findings"
+        badge_icon = "&#9888;" if top_flagged else "&#10003;"
+
+        with col_metrics:
+            flagged_count = sum(1 for f in findings if f["flagged"])
+            heart_flagged = sum(1 for f in heart_findings if f["flagged"])
+            top_conf = result.get("top_confidence", 0)
+            top_finding = result.get("top_finding", "N/A")
+            metric_html = f"""
+            <style>
+              @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+              body {{ margin:0;padding:0;background:transparent; }}
+            </style>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;font-family:Inter,sans-serif;">
+              <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#94A3B8;margin-bottom:5px;">Top Confidence</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:700;color:#059669;">{top_conf:.1f}<span style="font-size:0.72rem;color:#94A3B8;margin-left:4px;">%</span></div>
+              </div>
+              <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#94A3B8;margin-bottom:5px;">Findings Flagged</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:700;color:#059669;">{flagged_count}<span style="font-size:0.72rem;color:#94A3B8;margin-left:4px;">total</span></div>
+              </div>
+              <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#94A3B8;margin-bottom:5px;">Cardiac Flags</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:700;color:#059669;">{heart_flagged}<span style="font-size:0.72rem;color:#94A3B8;margin-left:4px;">findings</span></div>
+              </div>
+              <div style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:8px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                <div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#94A3B8;margin-bottom:5px;">Top Finding</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;font-weight:700;color:#059669;">{top_finding}</div>
+              </div>
+            </div>
+            """
+            st_components.html(metric_html, height=160, scrolling=False)
+
+        # Reuse _findings_html with purple accent for cardiac theme
+        ecg_html = _findings_html(findings, "Cardiac &amp; Chest Findings &mdash; ECG Analysis", accent="#7C5CFC")
+        height = 140 + min(len(findings), 8) * 62
+        st_components.html(ecg_html, height=height, scrolling=False)
+
+        # --- Dynamic per-scan description (changes with every ECG image) ---
+        ecg_desc  = _generate_scan_description(result, scan_type="ECG / Cardiac")
+        heart_flagged = sum(1 for f in heart_findings if f["flagged"])
+        desc_color = COLORS["danger"] if heart_flagged > 0 else COLORS["success"]
+        desc_icon  = "&#9888;" if heart_flagged > 0 else "&#10003;"
+        st.markdown(
+            f"""
+            <div class="context-strip" style="margin-top:16px;
+                border-left-color:{COLORS['purple']};background:#F5F3FF;">
+                <h4 style="color:{desc_color};">{desc_icon}&nbsp; AI Interpretation &mdash; ECG / Cardiac</h4>
+                <p>{ecg_desc}</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+# Updated pattern: capture the full bracket content (source + score) as one group
+_CITATION_PATTERN = re.compile(
+    r"--- Citation (\d+) \[(.*?), ([\d.]+)% match\] ---\n(.*?)(?=\n\n--- Citation|\Z)",
+    re.DOTALL,
+)
+
+
+def _relevance_label(match_pct_str: str) -> tuple[str, str, str]:
+    """Convert a raw Chroma relevance % (which can be 0 when distance > 1.0)
+    into a human-readable tier with colour coding.
+    Chroma cosine distance → relevance = (1 - distance) * 100.
+    Distances > 1 produce 0%; distance 0 = 100%.  Bucket into tiers.
+    """
+    try:
+        pct = float(match_pct_str)
+    except ValueError:
+        return "Relevant", "#00D2BE", "rgba(0,210,190,0.15)"
+    if pct >= 60:
+        return f"{pct:.0f}% match — High",  "#10E898", "rgba(16,232,152,0.12)"
+    if pct >= 30:
+        return f"{pct:.0f}% match — Medium", "#FFB547", "rgba(255,181,71,0.12)"
+    if pct > 0:
+        return f"{pct:.0f}% match — Low",    "#8BA3C7", "rgba(139,163,199,0.10)"
+    # 0% means Chroma distance was ≥ 1.0 — still a retrieved passage, just distant
+    return "Retrieved — Low similarity", "#8BA3C7", "rgba(139,163,199,0.10)"
+
+
+def render_citations_panel(raw_text: str) -> None:
+    """Parses rag_tool.py's plain-text citation format and renders styled cards
+    via st.components.v1.html() to avoid Streamlit's HTML sanitizer."""
+    matches = _CITATION_PATTERN.findall(raw_text)
+    if not matches:
+        # Plain error/no-results message
+        st_components.html(
+            f"""<p style='color:#8BA3C7;font-family:Inter,sans-serif;
+                         font-size:0.9rem;padding:8px 0;'>{raw_text}</p>""",
+            height=60,
+        )
+        return
+
+    cards_html = f"""
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+      body {{ margin:0;padding:0;background:transparent; }}
+    </style>
+    <div style="font-size:0.80rem;color:#94A3B8;margin-bottom:14px;font-weight:600;
+                font-family:Inter,sans-serif;">
+      &#128269; {len(matches)} relevant passage(s) retrieved from guideline index
+    </div>
+    """
+
+    for idx, source, match_pct, content in matches:
+        label, clr, bg = _relevance_label(match_pct)
+        # Shorten long source paths to just the filename
+        src_display = Path(source).name if source else "Unknown"
+        cards_html += f"""
+        <div style="background:#FFFFFF;border:1px solid #E2E8F0;
+                    border-left:3px solid #2563EB;border-radius:10px;
+                    padding:16px 20px;margin-bottom:12px;font-family:Inter,sans-serif;
+                    box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+          <div style="display:flex;justify-content:space-between;align-items:center;
+                      margin-bottom:10px;">
+            <span style="font-size:0.70rem;font-weight:700;text-transform:uppercase;
+                          letter-spacing:0.06em;color:#94A3B8;">
+              Citation {idx} &middot; {src_display}
+            </span>
+            <span style="font-size:0.72rem;font-weight:600;font-family:'JetBrains Mono',monospace;
+                          background:{bg};color:{clr};padding:2px 10px;
+                          border-radius:20px;border:1px solid {clr + '44'};">
+              {label}
+            </span>
+          </div>
+          <div style="font-size:0.90rem;color:#475569;line-height:1.65;">
+            {content.strip()}
+          </div>
+        </div>
+        """
+
+    total_height = 60 + len(matches) * 160
+    st_components.html(cards_html, height=total_height, scrolling=False)
+
+
+def render_guidelines_tab() -> None:
+    st.markdown(
+        """
+        <div class="section-head">
+            <div class="section-icon section-icon-teal">&#128218;</div>
+            <div>
+                <div class="section-label">Evidence-Based Literature Search</div>
+                <div class="section-sub">Query clinical guidelines &amp; treatment protocols via vector RAG</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Auto-generate a scan-specific query whenever a new result is available
+    _xray_result = st.session_state.get("xray_result")
+    _ecg_result  = st.session_state.get("ecg_result")
+    _latest_result = _xray_result or _ecg_result  # prefer X-ray; fall back to ECG
+
+    _default_query = "Empiric outpatient treatment guidelines for pneumonia"
+    if _latest_result:
+        # Key the auto-query on the top finding so it only changes when results change
+        _auto_query = _generate_guideline_query(_latest_result)
+        _query_key  = f"guideline_query_{_latest_result.get('top_finding', '')}"
+    else:
+        _auto_query = _default_query
+        _query_key  = "guideline_query_default"
+
+    # Show a banner when the query was auto-populated from scan findings
+    if _latest_result:
+        flagged = [f for f in _latest_result.get("findings", []) if f["flagged"]]
+        top_names = ", ".join(f["label"] for f in flagged[:3]) if flagged else _latest_result.get("top_finding", "")
+        st.markdown(
+            f"""
+            <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-left:4px solid {COLORS['teal']};
+                        border-radius:8px;padding:10px 16px;margin-bottom:12px;font-size:0.82rem;
+                        color:{COLORS['text_muted']};font-family:Inter,sans-serif;">
+                <strong style="color:{COLORS['teal']};">⚡ Auto-populated from latest scan findings:</strong>
+                &nbsp;{top_names}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    query = st.text_input(
+        "Search treatment protocols & guidelines",
+        value=_auto_query,
+        key=_query_key,
+    )
+
+    if st.button("&#128269;  Search Knowledge Base", key="search_guidelines"):
+        with st.spinner("Querying the clinical guideline index..."):
+            try:
+                response = query_clinical_rag(query)
+                st.session_state["guideline_result"] = response
+            except Exception as exc:
+                st.error(f"Search failed: {exc}")
+
+    if "guideline_result" in st.session_state:
+        render_citations_panel(st.session_state["guideline_result"])
+
+
+def render_agent_tab(patient: PatientContext) -> None:
+    st.markdown(
+        """
+        <div class="section-head">
+            <div class="section-icon section-icon-teal">&#129302;</div>
+            <div>
+                <div class="section-label">Physician Control &amp; Copilot Execution</div>
+                <div class="section-sub">Autonomous diagnostic pipeline &mdash; requires explicit physician authorization</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Build a dynamic context strip that reflects actual scan findings
+    _xray_res = st.session_state.get("xray_result")
+    _ecg_res  = st.session_state.get("ecg_result")
+
+    # Generate scan-specific descriptions for agent context
+    _xray_desc = _generate_scan_description(_xray_res, "Chest X-Ray") if _xray_res else None
+    _ecg_desc  = _generate_scan_description(_ecg_res,  "ECG / Cardiac") if _ecg_res else None
+
+    _scan_summary_html = ""
+    if _xray_desc:
+        _xf = sum(1 for f in _xray_res.get("findings", []) if f["flagged"])
+        _ic = "&#9888;" if _xf > 0 else "&#10003;"
+        _cl = COLORS["danger"] if _xf > 0 else COLORS["success"]
+        _scan_summary_html += (
+            f"<div style='margin-top:10px;padding:10px 12px;border-radius:8px;"
+            f"background:rgba(37,99,235,0.06);border:1px solid #BFDBFE;'>"
+            f"<span style='font-size:0.72rem;font-weight:700;text-transform:uppercase;"
+            f"letter-spacing:0.06em;color:{COLORS['teal']};'>&#127807; X-Ray</span>"
+            f"<br><span style='font-size:0.85rem;color:{_cl};font-weight:600;'>{_ic}&nbsp;</span>"
+            f"<span style='font-size:0.85rem;color:{COLORS['text_muted']};'>{_xray_desc}</span></div>"
+        )
+    if _ecg_desc:
+        _hf = sum(1 for f in _ecg_res.get("findings", []) if f["flagged"] and f["region"] == "heart")
+        _ic = "&#9888;" if _hf > 0 else "&#10003;"
+        _cl = COLORS["danger"] if _hf > 0 else COLORS["success"]
+        _scan_summary_html += (
+            f"<div style='margin-top:10px;padding:10px 12px;border-radius:8px;"
+            f"background:rgba(124,58,237,0.06);border:1px solid #DDD6FE;'>"
+            f"<span style='font-size:0.72rem;font-weight:700;text-transform:uppercase;"
+            f"letter-spacing:0.06em;color:{COLORS['purple']};'>&#9829; ECG / Cardiac</span>"
+            f"<br><span style='font-size:0.85rem;color:{_cl};font-weight:600;'>{_ic}&nbsp;</span>"
+            f"<span style='font-size:0.85rem;color:{COLORS['text_muted']};'>{_ecg_desc}</span></div>"
+        )
+
+    if not _scan_summary_html:
+        _scan_summary_html = (
+            f"<div style='margin-top:10px;color:{COLORS['text_dim']};font-size:0.85rem;font-style:italic;'>"
+            f"No scans completed yet. Run analysis in the X-Ray or ECG tabs to populate AI findings here."
+            f"</div>"
+        )
+
+    st.markdown(
+        f"""
+        <div class="context-strip">
+            <h4>Patient Context &middot; {patient.patient_id}</h4>
+            <p>
+                <strong style="color:#1E40AF;">{patient.name}</strong>
+                &nbsp;&middot;&nbsp; DOB: {patient.dob}
+                &nbsp;&middot;&nbsp; Age {patient.age} &middot; {patient.gender[0]} &middot; {patient.blood_type}
+                <br>
+                &#9673; {patient.physician} &nbsp;&middot;&nbsp; {patient.department} &nbsp;&middot;&nbsp; Ward {patient.ward}
+                <br><br>
+                <em>{patient.symptoms}</em>
+            </p>
+            {_scan_summary_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f"""
+        <div style="background:{COLORS['danger_bg']}; border:1px solid rgba(255,77,106,0.25);
+                    border-radius:10px; padding:14px 18px; margin-bottom:16px;">
+            <span style="font-size:0.78rem; font-weight:700; text-transform:uppercase;
+                          letter-spacing:0.06em; color:{COLORS['danger']};">
+                &#9888; Safety Checkpoint
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    approved = st.checkbox(
+        "I authorize the AI copilot to run the autonomous diagnostic pipeline."
+    )
+
+    if not st.button("&#9654;  Execute Copilot Agent", key="execute_agent"):
         return
 
     if not approved:
-        st.error("Execution halted: physician authorization is required.")
+        st.error("&#9888;  Execution halted: physician authorization is required.")
         return
 
-    st.success("Physician approval granted. Processing...")
+    st.success("&#10003;  Physician approval granted. Processing full diagnostic pipeline...")
 
-    default_image = find_default_xray()
-    with st.spinner("Running the imaging and guideline pipeline..."):
+    # Collect whichever images the physician uploaded
+    agent_xray  = st.session_state.get("xray_image_path") or find_default_xray()
+    agent_ecg   = st.session_state.get("ecg_image_path")
+
+    with st.spinner("Running full diagnostic pipeline (X-Ray + ECG + Guidelines)..."):
+        # --- X-Ray analysis ---
         try:
-            imaging_result = (
-                classify_image(default_image)
-                if default_image
-                else {"error": "No default radiograph found for this patient."}
+            xray_result = (
+                classify_image(agent_xray)
+                if agent_xray
+                else {"error": "No X-ray uploaded. Go to the X-Ray Analysis tab and upload an image first."}
             )
         except Exception as exc:
-            imaging_result = {"error": str(exc)}
+            xray_result = {"error": str(exc)}
+
+        # --- ECG analysis ---
+        try:
+            ecg_result = (
+                classify_image(agent_ecg)
+                if agent_ecg
+                else {"error": "No ECG uploaded. Go to the ECG Cardiac tab and upload an image first."}
+            )
+        except Exception as exc:
+            ecg_result = {"error": str(exc)}
+
+        # --- Build guideline query from combined flagged findings of both scans ---
+        _combined_findings: list = []
+        if "error" not in xray_result:
+            _combined_findings += [f for f in xray_result.get("findings", []) if f["flagged"]]
+        if "error" not in ecg_result:
+            _combined_findings += [f for f in ecg_result.get("findings", []) if f["flagged"]]
+
+        if _combined_findings:
+            _top_names = ", ".join(f["label"] for f in _combined_findings[:4])
+            _guideline_query = (
+                f"Treatment and management guidelines for {_top_names}"
+                + (f" in patient presenting with {patient.symptoms}" if patient.symptoms else "")
+            )
+        else:
+            _guideline_query = patient.symptoms or "General clinical management guidelines"
 
         try:
-            guideline_result = query_clinical_rag(patient.symptoms)
+            guideline_result = query_clinical_rag(_guideline_query)
         except Exception as exc:
             guideline_result = f"Guideline lookup failed: {exc}"
 
-    col_imaging, col_guideline = st.columns(2)
-    with col_imaging:
-        st.markdown("**Imaging findings**")
-        if "error" in imaging_result:
-            st.warning(imaging_result["error"])
+    # ---- Display: X-Ray | ECG | Guidelines ----
+    col_xray, col_ecg, col_guideline = st.columns(3)
+
+    with col_xray:
+        st.markdown(
+            """<div class="scan-tag scan-tag-xray" style="margin-bottom:8px;">
+               &#127807; X-Ray Findings</div>""",
+            unsafe_allow_html=True,
+        )
+        if "error" in xray_result:
+            st.warning(xray_result["error"])
         else:
-            flagged = [f for f in imaging_result.get("findings", []) if f["flagged"]]
-            st.info(
-                f"Top finding: {imaging_result.get('top_finding', 'N/A')} "
-                f"({imaging_result.get('top_confidence', 0)}%) · "
-                f"{len(flagged)} finding(s) above threshold"
+            render_findings_panel(
+                xray_result,
+                title="X-Ray &mdash; Agent Pipeline",
+                accent="#2563EB",
             )
+            # Dynamic X-ray description
+            _xd = _generate_scan_description(xray_result, "Chest X-Ray")
+            _xf = sum(1 for f in xray_result.get("findings", []) if f["flagged"])
+            _xc = COLORS["danger"] if _xf > 0 else COLORS["success"]
+            st.markdown(
+                f"""
+                <div class="context-strip" style="margin-top:12px;font-size:0.82rem;">
+                    <h4 style="color:{_xc};">{'&#9888;' if _xf > 0 else '&#10003;'}&nbsp; X-Ray Interpretation</h4>
+                    <p style="font-size:0.82rem;">{_xd}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    with col_ecg:
+        st.markdown(
+            f"""<div class="scan-tag scan-tag-ecg" style="margin-bottom:8px;">
+               &#9829; ECG Findings</div>""",
+            unsafe_allow_html=True,
+        )
+        if "error" in ecg_result:
+            st.warning(ecg_result["error"])
+        else:
+            render_findings_panel(
+                ecg_result,
+                title="ECG &mdash; Agent Pipeline",
+                accent="#7C3AED",
+            )
+            # Dynamic ECG description
+            _ed = _generate_scan_description(ecg_result, "ECG / Cardiac")
+            _hf = sum(1 for f in ecg_result.get("findings", [])
+                      if f["flagged"] and f["region"] == "heart")
+            _ec = COLORS["danger"] if _hf > 0 else COLORS["success"]
+            st.markdown(
+                f"""
+                <div class="context-strip" style="margin-top:12px;font-size:0.82rem;
+                    border-left-color:{COLORS['purple']};background:#F5F3FF;">
+                    <h4 style="color:{_ec};">{'&#9888;' if _hf > 0 else '&#10003;'}&nbsp; ECG Interpretation</h4>
+                    <p style="font-size:0.82rem;">{_ed}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
     with col_guideline:
-        st.markdown("**Evidence-based recommendation**")
-        st.markdown(guideline_result)
+        st.markdown(
+            """<div class="scan-tag scan-tag-xray" style="margin-bottom:8px;">
+               &#128218; Evidence-Based Recommendation</div>""",
+            unsafe_allow_html=True,
+        )
+        st.caption(f"Query: *{_guideline_query[:120]}{'...' if len(_guideline_query) > 120 else ''}*")
+        render_citations_panel(guideline_result)
+
+
+# --------------------------------------------------------------------------- #
+def render_combined_tab() -> None:
+    """Side-by-side view of X-Ray and ECG results when both are available."""
+    st.markdown(
+        """
+        <div class="section-head">
+            <div class="section-icon section-icon-teal">&#128202;</div>
+            <div>
+                <div class="section-label">Combined Diagnostic Results</div>
+                <div class="section-sub">X-Ray and ECG findings displayed together for comparison</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    has_xray = "xray_result" in st.session_state
+    has_ecg  = "ecg_result"  in st.session_state
+
+    if not has_xray and not has_ecg:
+        st.markdown(
+            f"""
+            <div style="background:{COLORS['info_bg']};border:1px solid {COLORS['border_teal']};
+                        border-radius:12px;padding:36px;text-align:center;">
+                <div style="font-size:2rem;margin-bottom:12px;">&#128202;</div>
+                <div style="font-size:1rem;font-weight:600;color:{COLORS['text_primary']};margin-bottom:6px;">
+                    No analyses completed yet
+                </div>
+                <div style="font-size:0.88rem;color:{COLORS['text_muted']};">
+                    Go to the <strong>X-Ray Analysis</strong> and <strong>ECG Cardiac</strong> tabs,
+                    upload images, and run analysis to see combined results here.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    col_xray, col_divider, col_ecg = st.columns([10, 1, 10])
+
+    # ---- X-Ray column ----
+    with col_xray:
+        st.markdown(
+            f"""
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;
+                        padding-bottom:10px;border-bottom:2px solid {COLORS['teal']};">
+              <span style="font-size:0.70rem;font-weight:700;text-transform:uppercase;
+                            letter-spacing:0.10em;color:{COLORS['teal']};">
+                &#127807; Chest X-Ray Findings
+              </span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if has_xray:
+            render_findings_panel(
+                st.session_state["xray_result"],
+                title="X-Ray Analysis",
+                accent="#2563EB",
+            )
+        else:
+            st.markdown(
+                f"""<div style="background:{COLORS['bg_deep']};border:1px dashed {COLORS['border']};
+                             border-radius:10px;padding:28px;text-align:center;color:{COLORS['text_dim']};font-size:0.88rem;">
+                    Upload an X-ray and run analysis to see findings here.
+                </div>""",
+                unsafe_allow_html=True,
+            )
+
+    # ---- Thin divider ----
+    with col_divider:
+        st.markdown(
+            """<div style="width:1px;background:#E2E8F0;min-height:400px;margin:0 auto;"></div>""",
+            unsafe_allow_html=True,
+        )
+
+    # ---- ECG column ----
+    with col_ecg:
+        st.markdown(
+            f"""
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;
+                        padding-bottom:10px;border-bottom:2px solid {COLORS['purple']};">
+              <span style="font-size:0.70rem;font-weight:700;text-transform:uppercase;
+                            letter-spacing:0.10em;color:{COLORS['purple']};">
+                &#9829; ECG Cardiac Findings
+              </span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if has_ecg:
+            render_findings_panel(
+                st.session_state["ecg_result"],
+                title="ECG Analysis",
+                accent="#7C3AED",
+            )
+        else:
+            st.markdown(
+                f"""<div style="background:{COLORS['bg_deep']};border:1px dashed {COLORS['border']};
+                             border-radius:10px;padding:28px;text-align:center;color:{COLORS['text_dim']};font-size:0.88rem;">
+                    Upload an ECG strip and run analysis to see findings here.
+                </div>""",
+                unsafe_allow_html=True,
+            )
 
 
 # --------------------------------------------------------------------------- #
@@ -697,16 +1397,33 @@ def main() -> None:
         initial_sidebar_state="expanded",
     )
     inject_theme()
-    render_masthead()
-    render_status_strip()
+
+    # Determine active scan mode from session state for dynamic masthead subtitle
+    has_xray = "xray_result" in st.session_state
+    has_ecg  = "ecg_result"  in st.session_state
+    if has_xray and has_ecg:
+        _scan_mode = "both"
+    elif has_xray:
+        _scan_mode = "xray"
+    elif has_ecg:
+        _scan_mode = "ecg"
+    else:
+        _scan_mode = "default"
+
+    render_masthead(scan_mode=_scan_mode)
+    render_metric_strip()
 
     patient = render_sidebar()
 
-    tab_radiology, tab_guidelines, tab_agent = st.tabs(
-        ["Radiology Analysis", "Clinical Guidelines", "Agent Workflow"]
+    tab_radiology, tab_ecg, tab_combined, tab_guidelines, tab_agent = st.tabs(
+        ["🫁 X-Ray Analysis", "❤️ ECG Cardiac", "📊 Combined Results", "📚 Clinical Guidelines", "🤖 Agent Workflow"]
     )
     with tab_radiology:
         render_radiology_tab()
+    with tab_ecg:
+        render_ecg_tab()
+    with tab_combined:
+        render_combined_tab()
     with tab_guidelines:
         render_guidelines_tab()
     with tab_agent:
