@@ -1,4 +1,51 @@
-Community-Acquired Pneumonia (CAP) Treatment Guidelines:
-1. Empiric outpatient treatment for healthy adults: Amoxicillin 1g TID, or Doxycycline 100mg BID.
-2. For patients with comorbidities: Augmentin or a cephalosporin PLUS a macrolide or respiratory fluoroquinolone (e.g., Levofloxacin).
-3. Diagnostic imaging: Chest Radiograph (X-ray) remains the gold standard to identify lobar consolidation or interstitial infiltrates.
+Community-Acquired Pneumonia (CAP) — Clinical Guidelines (ATS/IDSA 2019)
+
+DEFINITION
+Community-acquired pneumonia is an acute infection of the pulmonary parenchyma acquired outside a hospital or healthcare facility.
+
+DIAGNOSIS
+- Chest radiograph: gold standard; shows lobar consolidation, interstitial infiltrates, or multilobar opacities.
+- CT chest: more sensitive; use when X-ray is non-diagnostic and clinical suspicion is high.
+- Sputum Gram stain and culture: obtain before antibiotics in ICU patients.
+- Blood cultures: recommended for ICU admission, cavitary infiltrates, leukopenia, or active alcohol abuse.
+- Urinary antigen tests: Legionella and Streptococcus pneumoniae for moderate-to-severe CAP.
+- Procalcitonin + CRP: supports antibiotic initiation decision.
+- Pulse oximetry and ABG: assess oxygenation and ventilation.
+
+SEVERITY STRATIFICATION (PSI / CURB-65)
+CURB-65 score (1 point each): Confusion, Urea >7 mmol/L, Respiratory rate ≥30, Blood pressure <90/60 mmHg, Age ≥65.
+- Score 0-1: Outpatient treatment.
+- Score 2: Consider short hospitalization or supervised outpatient.
+- Score 3+: Hospitalize; consider ICU if score ≥ 4-5.
+
+TREATMENT — OUTPATIENT (Mild CAP, no comorbidities)
+- Amoxicillin 500 mg TID for 5 days (first-line).
+- Doxycycline 100 mg BID for 5 days (alternative).
+- Azithromycin 500 mg day 1, then 250 mg days 2-5 (only if local pneumococcal resistance <25%).
+
+TREATMENT — OUTPATIENT (With comorbidities: DM, CKD, CHF, malignancy, immunosuppression, prior 3-month antibiotic use)
+- Combination: Amoxicillin-clavulanate OR cephalosporin PLUS azithromycin or doxycycline.
+- Monotherapy: Respiratory fluoroquinolone (Levofloxacin 750 mg OD, or Moxifloxacin 400 mg OD) for 5 days.
+
+TREATMENT — INPATIENT (Non-ICU)
+- Beta-lactam (Ampicillin-sulbactam OR Ceftriaxone 1-2g IV OD) PLUS macrolide (Azithromycin 500 mg IV/PO OD).
+- Respiratory fluoroquinolone monotherapy if beta-lactam allergy.
+- Duration: 5 days if clinical stability achieved (afebrile, HR <100, RR <24, SBP >90, O2 sat >90%).
+
+TREATMENT — ICU (Severe CAP)
+- Beta-lactam (Ceftriaxone or Ampicillin-sulbactam) PLUS Azithromycin OR respiratory fluoroquinolone.
+- Pseudomonas risk: Add Piperacillin-tazobactam or Cefepime; add Ciprofloxacin or Aminoglycoside.
+- MRSA risk (necrotizing, cavitary, post-influenza): Add Vancomycin or Linezolid.
+- Corticosteroids (Methylprednisolone 0.5 mg/kg BID x5 days) for refractory septic shock.
+
+SUPPORTIVE CARE
+- Supplemental oxygen: target SpO2 94-98%; 88-92% in COPD.
+- High-flow nasal oxygen (HFNO) or NIV if SpO2 <90% despite O2.
+- ICU intubation: if PaO2/FiO2 <150, worsening encephalopathy, inability to protect airway.
+- IV fluids: cautious in bilateral infiltrates (risk of pulmonary edema).
+- VTE prophylaxis: LMWH in hospitalized patients.
+
+FOLLOW-UP
+- Chest X-ray at 6-8 weeks to confirm radiographic resolution (especially in smokers >50 years to exclude malignancy).
+- Pneumococcal vaccine: PCV20 for age ≥65 or high-risk adults.
+- Influenza vaccine: annual, for all adults.

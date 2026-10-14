@@ -1,0 +1,77 @@
+Pulmonary Conditions — Chest X-Ray Findings & Management Guidelines
+
+CONSOLIDATION
+Definition: Replacement of alveolar air with fluid, pus, blood, or cells — appears as homogeneous opacification with air bronchograms.
+Common causes: Bacterial pneumonia, aspiration, pulmonary infarction, lung contusion, alveolar haemorrhage.
+Chest X-Ray Features:
+- Homogeneous opacification, lobar or segmental distribution.
+- Air bronchograms (pathognomonic of alveolar filling).
+- Loss of silhouette sign (right middle lobe: right heart border; lingula: left heart border).
+Management:
+- Treat underlying cause (antibiotics for pneumonia, anticoagulation for infarct).
+- Repeat CXR at 6-8 weeks to confirm resolution and exclude underlying malignancy.
+
+INTERSTITIAL INFILTRATES / DIFFUSE BILATERAL INFILTRATES
+Causes: Viral pneumonia (COVID-19, influenza), atypical pneumonia (Mycoplasma, Legionella), pulmonary fibrosis, ARDS, heart failure.
+Management of ARDS (Berlin criteria: PaO2/FiO2 <300 + bilateral infiltrates + not explained by cardiac failure):
+- Low tidal volume ventilation: 6 mL/kg IBW, plateau pressure <30 cmH2O.
+- PEEP: titrate to oxygenation using ARDSnet PEEP/FiO2 tables.
+- Prone positioning: ≥16h/day if PaO2/FiO2 <150 on FiO2 ≥0.6 (reduces mortality by 16%).
+- Neuromuscular blockade: Cisatracurium infusion in first 48h if PaO2/FiO2 <150.
+- Dexamethasone 6 mg OD for 10 days in moderate-severe ARDS (DEXA-ARDS trial).
+- Avoid: fluid overload, high driving pressures, high FiO2 (target SpO2 88-95%).
+
+PNEUMOTHORAX
+Types: Primary spontaneous (young, tall, thin males), secondary (COPD, asthma, Marfan's), tension, traumatic.
+CXR features: Visible lung edge without vascular markings, deep sulcus sign (supine).
+Management:
+- Small (<2 cm, stable): observe, 100% O2 accelerates resorption, follow-up CXR at 2-4h.
+- Large or symptomatic: aspiration (14G cannula, 2nd intercostal space, mid-clavicular line) or chest drain.
+- Tension pneumothorax: immediate needle decompression (do not wait for CXR), then chest drain.
+- Recurrent: referral for VATS pleurodesis/pleurectomy.
+
+LUNG NODULE / MASS
+Fleischner Society Guidelines for Incidental Pulmonary Nodules (2017):
+- <6 mm, low risk: no routine follow-up.
+- 6-8 mm, low risk: CT at 6-12 months, then 18-24 months.
+- >8 mm, any risk: CT at 3 months; consider PET-CT and/or biopsy.
+- High-risk features: spiculated margins, upper lobe location, history of smoking/malignancy.
+- Solid nodule vs subsolid (ground-glass): ground-glass has higher likelihood of adenocarcinoma spectrum; shorter follow-up intervals.
+Biopsy indications: Nodule >1 cm, PET avid, growing on serial imaging, high pre-test probability of malignancy.
+
+CHRONIC OBSTRUCTIVE PULMONARY DISEASE (COPD) EXACERBATION
+Definition: Acute worsening of respiratory symptoms beyond normal day-to-day variation requiring change in medication.
+CXR: Hyperinflation (>6 ribs anteriorly, flattened diaphragm), increased anteroposterior diameter, bullae. Exclude pneumonia, pneumothorax, pulmonary oedema.
+Management:
+- Bronchodilators: SABA (Salbutamol 2.5mg NEB q4-6h) + SAMA (Ipratropium 500mcg NEB TID-QID).
+- Systemic corticosteroids: Prednisolone 40 mg OD x5 days (reduces treatment failure, improves FEV1).
+- Antibiotics: if purulent sputum, increased breathlessness, or increased sputum volume (Amoxicillin, Doxycycline, or Azithromycin 5 days).
+- Controlled oxygen: target SpO2 88-92% (avoid hyperoxia — suppresses hypoxic drive).
+- NIV (BiPAP): if pH <7.35 + PaCO2 >6 kPa despite initial therapy (reduces intubation and mortality).
+- DVT prophylaxis: LMWH (Enoxaparin 40 mg SC OD).
+- Discharge planning: pulmonary rehab referral, smoking cessation, inhaler technique review, influenza and pneumococcal vaccine.
+
+PULMONARY EMBOLISM
+Wells Score: (DVT symptoms +3, HR >100 +1.5, immobilisation/surgery last 4 weeks +1.5, previous PE/DVT +1.5, haemoptysis +1, malignancy +1, alternative diagnosis less likely +3).
+- Score >4: High probability. Score ≤4: Low-moderate probability.
+Investigations:
+- D-dimer: sensitive but not specific; negative D-dimer (with low pre-test probability) excludes PE.
+- CTPA: investigation of choice for confirming PE.
+- V/Q scan: if CTPA contraindicated (contrast allergy, renal failure, pregnancy).
+- Echo: right heart strain (RV dilation, McConnell's sign, D-shaped septum) in massive/submassive PE.
+Management:
+- Haemodynamically stable: DOAC (Rivaroxaban 15 mg BD x21 days then 20 mg OD, or Apixaban 10 mg BD x7 days then 5 mg BD).
+- LMWH bridge + warfarin: if DOAC not suitable (antiphospholipid syndrome, renal failure, pregnancy — use LMWH throughout).
+- Massive PE (haemodynamic instability): systemic thrombolysis (Alteplase 100 mg IV over 2h) if no contraindications. Surgical embolectomy or catheter-directed thrombolysis if thrombolysis failed/contraindicated.
+- Duration: provoked PE — 3 months. Unprovoked — 6-12 months minimum; consider indefinite anticoagulation with DOAC if low bleeding risk.
+
+TUBERCULOSIS (TB)
+CXR features (Post-primary): Upper lobe consolidation/cavitation, fibrosis, calcified nodes, miliary pattern (1-2mm nodules throughout).
+Diagnosis: Sputum AFB smear and culture (gold standard), GeneXpert MTB/RIF (rapid, detects rifampicin resistance), Mantoux test, IGRA (QuantiFERON-TB Gold).
+Treatment (Drug-sensitive TB):
+- Initiation phase (2 months): HRZE (Isoniazid + Rifampicin + Pyrazinamide + Ethambutol).
+- Continuation phase (4 months): HR (Isoniazid + Rifampicin).
+- Pyridoxine 25 mg OD with Isoniazid to prevent peripheral neuropathy.
+- Monthly sputum smear/culture to monitor response.
+- Notify public health authority. Contact tracing mandatory.
+Drug-resistant TB: MDR-TB (resistant to H+R) — bedaquiline-containing regimens under specialist supervision.

@@ -8,12 +8,18 @@ search tool, gated behind an explicit physician-approval workflow.
 Dashboard supports both:
   - Chest X-ray analysis  (lung findings via TorchXRayVision DenseNet121)
   - ECG / cardiac rhythm  (heart-finding context & rate interpretation)
+
+New features:
+  - Login gate: physician credentials required before dashboard access
+  - Patient Records: temporary session-based record store with table view
+  - Doctor Feedback: per-finding confirmation / override panel
 """
 
+import datetime
 import os
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +36,16 @@ from tools.rag_tool import query_clinical_rag  # noqa: E402
 
 TEMP_DIR = Path("./temp")
 DEFAULT_XRAY_CANDIDATES = ("./results/xray.png", "./xray.png")
+
+# --------------------------------------------------------------------------- #
+# Auth — hardcoded physician credentials (replace with DB in production)
+# --------------------------------------------------------------------------- #
+_PHYSICIAN_USERS: dict[str, dict] = {
+    "dr.sharma": {"password": "clinic@2025", "display": "Dr. Priya Sharma",  "dept": "Pulmonology"},
+    "dr.khan":   {"password": "cardio#2025", "display": "Dr. Amir Khan",     "dept": "Cardiology"},
+    "dr.jones":  {"password": "icu!2025",    "display": "Dr. Sarah Jones",   "dept": "ICU"},
+    "admin":     {"password": "admin1234",   "display": "Admin User",         "dept": "Administration"},
+}
 
 
 # --------------------------------------------------------------------------- #
@@ -316,6 +332,108 @@ def inject_theme() -> None:
             margin: 14px 0 6px; padding-top: 12px;
             border-top: 1px solid {COLORS['border']};
         }}
+        /* ===== LOGIN PAGE ===== */
+        .login-wrap {{
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #0F172A 0%, #1E3A5F 50%, #1E40AF 100%);
+        }}
+        .login-card {{
+            background: #FFFFFF;
+            border-radius: 20px;
+            padding: 48px 44px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.30);
+        }}
+        .login-logo {{
+            text-align: center;
+            margin-bottom: 28px;
+        }}
+        .login-logo-icon {{
+            font-size: 2.8rem;
+            display: block;
+            margin-bottom: 10px;
+        }}
+        .login-logo-title {{
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: {COLORS['text_primary']};
+            letter-spacing: -0.03em;
+        }}
+        .login-logo-sub {{
+            font-size: 0.80rem;
+            color: {COLORS['text_muted']};
+            margin-top: 4px;
+        }}
+        .login-error {{
+            background: {COLORS['danger_bg']};
+            border: 1px solid rgba(220,38,38,0.25);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: {COLORS['danger']};
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 14px;
+        }}
+
+        /* ===== RECORDS TABLE ===== */
+        .records-table {{
+            width: 100%; border-collapse: collapse;
+            font-family: 'Inter', sans-serif; font-size: 0.82rem;
+        }}
+        .records-table th {{
+            background: {COLORS['bg_deep']};
+            color: {COLORS['text_dim']};
+            font-size: 0.65rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.08em;
+            padding: 9px 14px; border-bottom: 1px solid {COLORS['border']};
+            text-align: left;
+        }}
+        .records-table td {{
+            padding: 10px 14px;
+            border-bottom: 1px solid {COLORS['border']};
+            color: {COLORS['text_primary']};
+            vertical-align: middle;
+        }}
+        .records-table tr:hover td {{ background: {COLORS['bg_deep']}; }}
+        .rec-badge-flagged {{
+            background: {COLORS['danger_bg']}; color: {COLORS['danger']};
+            border: 1px solid rgba(220,38,38,0.20);
+            border-radius: 20px; padding: 2px 9px;
+            font-size: 0.68rem; font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }}
+        .rec-badge-ok {{
+            background: {COLORS['success_bg']}; color: {COLORS['success']};
+            border: 1px solid rgba(5,150,105,0.20);
+            border-radius: 20px; padding: 2px 9px;
+            font-size: 0.68rem; font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }}
+
+        /* ===== FEEDBACK PANEL ===== */
+        .feedback-card {{
+            background: {COLORS['bg_card']};
+            border: 1px solid {COLORS['border']};
+            border-left: 4px solid {COLORS['purple']};
+            border-radius: 12px;
+            padding: 18px 22px;
+            margin-bottom: 12px;
+        }}
+        .feedback-finding-name {{
+            font-size: 0.90rem; font-weight: 700;
+            color: {COLORS['text_primary']}; margin-bottom: 8px;
+        }}
+        .feedback-submitted {{
+            background: {COLORS['success_bg']};
+            border: 1px solid rgba(5,150,105,0.25);
+            border-radius: 10px; padding: 12px 18px;
+            color: {COLORS['success']}; font-weight: 600;
+            font-size: 0.88rem; margin-top: 12px;
+        }}
         </style>
         """,
         unsafe_allow_html=True,
@@ -340,6 +458,26 @@ class PatientContext:
     physician: str
     department: str
     ward: str
+
+
+@dataclass
+class PatientRecord:
+    """A snapshot of a patient visit stored in session memory."""
+    timestamp: str
+    name: str
+    patient_id: str
+    age: int
+    gender: str
+    blood_type: str
+    symptoms: str
+    physician: str
+    department: str
+    ward: str
+    xray_top_finding: str = "—"
+    xray_flagged: int = 0
+    ecg_top_finding: str = "—"
+    ecg_flagged: int = 0
+    feedback: list = field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- #
@@ -462,7 +600,8 @@ def render_sidebar() -> PatientContext:
                            letter-spacing:0.1em;color:{COLORS['text_dim']};margin:14px 0 6px;">Admission</div>""",
             unsafe_allow_html=True,
         )
-        physician = st.text_input("Attending Physician", "Dr. Priya Sharma", key="pt_physician")
+        _default_physician = st.session_state.get("logged_in_user", "Dr. Priya Sharma")
+        physician = st.text_input("Attending Physician", _default_physician, key="pt_physician")
         col_dept, col_ward = st.columns(2)
         with col_dept:
             department = st.selectbox(
@@ -1387,6 +1526,405 @@ def render_combined_tab() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Login page
+# --------------------------------------------------------------------------- #
+def render_login_page() -> None:
+    """Full-screen login gate — CSS overrides Streamlit's layout completely."""
+
+    # --- Full-page style override ---
+    st.markdown(
+        """
+        <style>
+        /* Hide Streamlit chrome on login page */
+        header[data-testid="stHeader"]          { display: none !important; }
+        section[data-testid="stSidebar"]        { display: none !important; }
+        #MainMenu, footer, .stDeployButton      { display: none !important; }
+        [data-testid="stToolbar"]               { display: none !important; }
+
+        /* Full-screen gradient background */
+        .stApp {
+            background: linear-gradient(135deg, #0A0F1E 0%, #0F2044 40%, #1a3566 70%, #1E40AF 100%) !important;
+            min-height: 100vh;
+        }
+
+        /* Remove default block padding so we can centre freely */
+        .block-container {
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            max-width: 100% !important;
+        }
+
+        /* The middle column becomes our card */
+        div[data-testid="column"]:nth-child(2) > div:first-child {
+            background: #FFFFFF;
+            border-radius: 20px;
+            padding: 44px 40px 36px !important;
+            box-shadow: 0 32px 80px rgba(0,0,0,0.45);
+            margin-top: 10vh;
+        }
+
+        /* Card heading — white because it sits on the dark bg above the card */
+        div[data-testid="column"]:nth-child(2) h3 {
+            color: #FFFFFF !important;
+            font-size: 1.15rem !important;
+            font-weight: 700 !important;
+            margin: 0 0 20px !important;
+            text-align: center;
+            letter-spacing: -0.01em;
+        }
+
+        /* Override label colours inside the card */
+        div[data-testid="column"]:nth-child(2) [data-testid="stWidgetLabel"] p,
+        div[data-testid="column"]:nth-child(2) [data-testid="stWidgetLabel"] label {
+            color: #64748B !important;
+            font-size: 0.72rem !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.07em;
+        }
+
+        /* Sign In button — make it pop */
+        div[data-testid="column"]:nth-child(2) .stButton > button {
+            background: linear-gradient(135deg, #1E40AF, #2563EB) !important;
+            color: #FFFFFF !important;
+            font-size: 0.95rem !important;
+            font-weight: 700 !important;
+            padding: 14px 0 !important;
+            border-radius: 10px !important;
+            border: none !important;
+            box-shadow: 0 6px 20px rgba(37,99,235,0.40) !important;
+            margin-top: 6px !important;
+            letter-spacing: 0.02em;
+        }
+        div[data-testid="column"]:nth-child(2) .stButton > button:hover {
+            background: linear-gradient(135deg, #1D4ED8, #3B82F6) !important;
+            box-shadow: 0 8px 28px rgba(37,99,235,0.55) !important;
+            transform: translateY(-1px) !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Spacer row to push card down
+    st.markdown("<div style='height:6vh'></div>", unsafe_allow_html=True)
+
+    # Centre column — this becomes the visual card via CSS above
+    _, col_mid, _ = st.columns([1, 1.1, 1])
+    with col_mid:
+        # Logo + heading block (all on dark bg — white text throughout)
+        st.markdown(
+            """
+            <div style="text-align:center;margin-bottom:30px;">
+                <div style="font-size:3rem;margin-bottom:10px;">🩺</div>
+                <div style="font-size:1.55rem;font-weight:800;color:#FFFFFF;letter-spacing:-0.03em;">
+                    Clinical AI Copilot
+                </div>
+                <div style="font-size:0.82rem;color:#93C5FD;margin-top:5px;font-weight:500;">
+                    Physician Decision Support Platform
+                </div>
+                <div style="width:48px;height:3px;background:linear-gradient(90deg,#60A5FA,#2563EB);
+                            border-radius:2px;margin:14px auto 16px;"></div>
+                <div style="font-size:1.10rem;font-weight:700;color:#FFFFFF;letter-spacing:-0.01em;">
+                    Sign in to your account
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        username = st.text_input("USERNAME", placeholder="e.g. dr.sharma", key="login_user", label_visibility="visible")
+        password = st.text_input("PASSWORD", type="password", placeholder="Enter your password", key="login_pass", label_visibility="visible")
+
+        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+
+        if st.button("🔐  Sign In", key="login_btn", use_container_width=True):
+            user = _PHYSICIAN_USERS.get(username.strip().lower())
+            if user and user["password"] == password:
+                st.session_state["authenticated"] = True
+                st.session_state["logged_in_user"] = user["display"]
+                st.session_state["logged_in_dept"] = user["dept"]
+                st.rerun()
+            else:
+                st.error("❌  Invalid username or password.")
+
+        st.markdown(
+            """
+            <div style="margin-top:20px;font-size:0.72rem;color:#94A3B8;text-align:center;line-height:1.7;">
+                🔒 Access restricted to authorized clinical staff only<br>
+                <span style="font-size:0.68rem;color:#CBD5E1;">
+                    Demo: <strong style="color:#94A3B8;">dr.sharma</strong> / clinic@2025
+                    &nbsp;·&nbsp;
+                    <strong style="color:#94A3B8;">dr.khan</strong> / cardio#2025
+                </span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+# --------------------------------------------------------------------------- #
+# Patient Records tab
+# --------------------------------------------------------------------------- #
+def render_records_tab() -> None:
+    """Session-scoped patient record store — saved per physician session."""
+    st.markdown(
+        """
+        <div class="section-head">
+            <div class="section-icon section-icon-teal">📋</div>
+            <div>
+                <div class="section-label">Patient Visit Records</div>
+                <div class="section-sub">Temporary session store — records are cleared when the app restarts</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Init store
+    if "patient_records" not in st.session_state:
+        st.session_state["patient_records"] = []
+
+    records: list[PatientRecord] = st.session_state["patient_records"]
+
+    # ---- Save current patient button ----
+    col_save, col_clear = st.columns([2, 1])
+    with col_save:
+        if st.button("💾  Save Current Patient to Records", key="save_record"):
+            # Pull current patient from session_state widget values
+            xray_res = st.session_state.get("xray_result", {})
+            ecg_res  = st.session_state.get("ecg_result",  {})
+            rec = PatientRecord(
+                timestamp    = datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                name         = st.session_state.get("pt_name", "—"),
+                patient_id   = st.session_state.get("pt_id",   "—"),
+                age          = int(st.session_state.get("pt_age", 0)),
+                gender       = st.session_state.get("pt_gender", "—"),
+                blood_type   = st.session_state.get("pt_blood",  "—"),
+                symptoms     = st.session_state.get("pt_symptoms", "—"),
+                physician    = st.session_state.get("pt_physician", "—"),
+                department   = st.session_state.get("pt_dept", "—"),
+                ward         = st.session_state.get("pt_ward", "—"),
+                xray_top_finding = xray_res.get("top_finding", "—") if xray_res else "—",
+                xray_flagged     = sum(1 for f in xray_res.get("findings", []) if f["flagged"]) if xray_res else 0,
+                ecg_top_finding  = ecg_res.get("top_finding",  "—") if ecg_res else "—",
+                ecg_flagged      = sum(1 for f in ecg_res.get("findings",  []) if f["flagged"]) if ecg_res else 0,
+                feedback         = list(st.session_state.get("doctor_feedback", [])),
+            )
+            records.append(rec)
+            st.session_state["patient_records"] = records
+            st.success(f"✅ Record saved for **{rec.name}** ({rec.patient_id}) at {rec.timestamp}")
+
+    with col_clear:
+        if st.button("🗑️  Clear All Records", key="clear_records"):
+            st.session_state["patient_records"] = []
+            st.rerun()
+
+    if not records:
+        st.markdown(
+            f"""
+            <div style="background:{COLORS['info_bg']};border:1px dashed {COLORS['border_teal']};
+                        border-radius:12px;padding:36px;text-align:center;margin-top:12px;">
+                <div style="font-size:2rem;margin-bottom:10px;">📋</div>
+                <div style="font-size:0.95rem;font-weight:600;color:{COLORS['text_primary']};margin-bottom:4px;">
+                    No records saved yet
+                </div>
+                <div style="font-size:0.85rem;color:{COLORS['text_muted']};">
+                    Fill in a patient's details, run analyses, then click
+                    <strong>Save Current Patient to Records</strong>.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    # ---- Search/filter ----
+    search = st.text_input("🔍 Search records by name or MRN", key="rec_search", placeholder="Type to filter...")
+    filtered = [
+        r for r in records
+        if search.lower() in r.name.lower() or search.lower() in r.patient_id.lower()
+    ] if search else records
+
+    st.caption(f"Showing **{len(filtered)}** of **{len(records)}** record(s)")
+
+    # ---- Table ----
+    rows_html = ""
+    for i, r in enumerate(reversed(filtered)):
+        xray_badge = (
+            f'<span class="rec-badge-flagged">⚠ {r.xray_flagged} flags — {r.xray_top_finding}</span>'
+            if r.xray_flagged > 0
+            else f'<span class="rec-badge-ok">✓ {r.xray_top_finding}</span>'
+        )
+        ecg_badge = (
+            f'<span class="rec-badge-flagged">⚠ {r.ecg_flagged} flags — {r.ecg_top_finding}</span>'
+            if r.ecg_flagged > 0
+            else f'<span class="rec-badge-ok">✓ {r.ecg_top_finding}</span>'
+        )
+        fb_count = len(r.feedback)
+        fb_text  = f"{fb_count} note(s)" if fb_count else "—"
+        rows_html += f"""
+        <tr>
+            <td><strong>{r.name}</strong><br>
+                <span style="font-size:0.70rem;color:#94A3B8;">{r.patient_id}</span></td>
+            <td>{r.age} / {r.gender} / {r.blood_type}</td>
+            <td>{r.physician}<br>
+                <span style="font-size:0.70rem;color:#94A3B8;">{r.department} · {r.ward}</span></td>
+            <td>{xray_badge}</td>
+            <td>{ecg_badge}</td>
+            <td style="font-size:0.78rem;color:#475569;max-width:180px;">{r.symptoms[:80]}{'…' if len(r.symptoms)>80 else ''}</td>
+            <td style="font-size:0.75rem;color:#7C3AED;">{fb_text}</td>
+            <td style="font-size:0.72rem;color:#94A3B8;">{r.timestamp}</td>
+        </tr>
+        """
+
+    table_html = f"""
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+      body {{ margin:0;padding:0;background:transparent; }}
+    </style>
+    <div style="overflow-x:auto;">
+    <table class="records-table">
+      <thead><tr>
+        <th>Patient</th><th>Age/Sex/Blood</th><th>Physician</th>
+        <th>X-Ray</th><th>ECG</th><th>Symptoms</th><th>Feedback</th><th>Saved At</th>
+      </tr></thead>
+      <tbody>{rows_html}</tbody>
+    </table>
+    </div>
+    """
+    height = 80 + len(filtered) * 72
+    st_components.html(table_html, height=min(height, 600), scrolling=True)
+
+
+# --------------------------------------------------------------------------- #
+# Doctor Feedback panel (injected into Agent Workflow tab)
+# --------------------------------------------------------------------------- #
+def render_feedback_panel(patient: PatientContext) -> None:
+    """Allow the physician to confirm or override individual AI findings."""
+    st.markdown(
+        f"""
+        <div class="section-head" style="margin-top:28px;">
+            <div class="section-icon section-icon-purple">💬</div>
+            <div>
+                <div class="section-label">Physician Feedback &amp; Finding Confirmation</div>
+                <div class="section-sub">Confirm AI findings you are certain about, or flag disagreements for the record</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    xray_res = st.session_state.get("xray_result", {})
+    ecg_res  = st.session_state.get("ecg_result",  {})
+
+    all_findings: list[dict] = []
+    if xray_res:
+        for f in xray_res.get("findings", [])[:6]:
+            all_findings.append({**f, "source": "X-Ray"})
+    if ecg_res:
+        for f in ecg_res.get("findings", [])[:6]:
+            all_findings.append({**f, "source": "ECG"})
+
+    if not all_findings:
+        st.markdown(
+            f"""
+            <div style="background:{COLORS['info_bg']};border:1px dashed {COLORS['border_teal']};
+                        border-radius:10px;padding:24px;text-align:center;color:{COLORS['text_muted']};font-size:0.88rem;">
+                Run an X-Ray or ECG analysis first to enable physician feedback.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    if "doctor_feedback" not in st.session_state:
+        st.session_state["doctor_feedback"] = []
+
+    st.markdown(
+        f"<div style='font-size:0.80rem;color:{COLORS['text_muted']};margin-bottom:14px;'>"
+        f"Review each AI finding below. Select your clinical assessment and add notes where needed."
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    feedback_items = []
+    for idx, finding in enumerate(all_findings):
+        src_color = COLORS["teal"] if finding["source"] == "X-Ray" else COLORS["purple"]
+        src_icon  = "🫁" if finding["source"] == "X-Ray" else "❤️"
+        flag_icon = "⚠" if finding["flagged"] else "✓"
+        flag_clr  = COLORS["danger"] if finding["flagged"] else COLORS["success"]
+
+        st.markdown(
+            f"""
+            <div class="feedback-card">
+              <div class="feedback-finding-name">
+                {src_icon} <span style="color:{src_color};font-size:0.72rem;font-weight:700;
+                  text-transform:uppercase;letter-spacing:0.06em;">{finding['source']}</span>
+                &nbsp;·&nbsp;
+                {finding['label']}
+                &nbsp;
+                <span style="font-size:0.78rem;color:{flag_clr};">{flag_icon} {finding['probability']:.1f}%</span>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        col_a, col_b = st.columns([1, 2])
+        with col_a:
+            assessment = st.selectbox(
+                "Clinical Assessment",
+                ["— Select —", "✅ Confirmed — I agree with AI", "❌ Overridden — AI is incorrect",
+                 "⚠️ Uncertain — Needs further workup", "➕ Additional finding noted"],
+                key=f"fb_assess_{idx}",
+            )
+        with col_b:
+            note = st.text_input(
+                "Physician note (optional)",
+                placeholder="e.g. Correlates with clinical presentation...",
+                key=f"fb_note_{idx}",
+            )
+
+        if assessment != "— Select —":
+            feedback_items.append({
+                "finding":    finding["label"],
+                "source":     finding["source"],
+                "probability": finding["probability"],
+                "assessment": assessment,
+                "note":       note,
+                "physician":  st.session_state.get("logged_in_user", patient.physician),
+                "timestamp":  datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+            })
+
+    if st.button("💾  Submit Physician Feedback", key="submit_feedback"):
+        if feedback_items:
+            st.session_state["doctor_feedback"] = feedback_items
+            st.markdown(
+                f"""
+                <div class="feedback-submitted">
+                    ✅ Feedback recorded for {len(feedback_items)} finding(s) by
+                    <strong>{st.session_state.get('logged_in_user', patient.physician)}</strong>.
+                    Save the patient record to include this feedback.
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.warning("Please select a clinical assessment for at least one finding before submitting.")
+
+    # Show previously submitted feedback
+    existing = st.session_state.get("doctor_feedback", [])
+    if existing:
+        with st.expander(f"📝 View submitted feedback ({len(existing)} item(s))", expanded=False):
+            for fb in existing:
+                st.markdown(
+                    f"**{fb['finding']}** ({fb['source']}) — {fb['assessment']}"
+                    + (f" | *{fb['note']}*" if fb['note'] else "")
+                    + f" — `{fb['physician']}` @ {fb['timestamp']}"
+                )
+
+
+# --------------------------------------------------------------------------- #
 # App entry point
 # --------------------------------------------------------------------------- #
 def main() -> None:
@@ -1397,6 +1935,32 @@ def main() -> None:
         initial_sidebar_state="expanded",
     )
     inject_theme()
+
+    # ---- Authentication gate ----
+    if not st.session_state.get("authenticated", False):
+        render_login_page()
+        return
+
+    # ---- Logged-in header badge (sidebar top) ----
+    with st.sidebar:
+        logged_user = st.session_state.get("logged_in_user", "Unknown")
+        logged_dept = st.session_state.get("logged_in_dept", "")
+        st.markdown(
+            f"""
+            <div style="background:linear-gradient(135deg,#1E40AF,#2563EB);border-radius:10px;
+                        padding:12px 14px;margin-bottom:10px;">
+              <div style="font-size:0.65rem;font-weight:700;text-transform:uppercase;
+                          letter-spacing:0.1em;color:#93C5FD;margin-bottom:3px;">Signed in as</div>
+              <div style="font-size:0.90rem;font-weight:700;color:#FFFFFF;">{logged_user}</div>
+              <div style="font-size:0.72rem;color:#BFDBFE;">{logged_dept}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button("🚪 Sign Out", key="signout_btn", use_container_width=True):
+            for k in list(st.session_state.keys()):
+                del st.session_state[k]
+            st.rerun()
 
     # Determine active scan mode from session state for dynamic masthead subtitle
     has_xray = "xray_result" in st.session_state
@@ -1415,8 +1979,9 @@ def main() -> None:
 
     patient = render_sidebar()
 
-    tab_radiology, tab_ecg, tab_combined, tab_guidelines, tab_agent = st.tabs(
-        ["🫁 X-Ray Analysis", "❤️ ECG Cardiac", "📊 Combined Results", "📚 Clinical Guidelines", "🤖 Agent Workflow"]
+    tab_radiology, tab_ecg, tab_combined, tab_guidelines, tab_agent, tab_records = st.tabs(
+        ["🫁 X-Ray Analysis", "❤️ ECG Cardiac", "📊 Combined Results",
+         "📚 Clinical Guidelines", "🤖 Agent Workflow", "📋 Patient Records"]
     )
     with tab_radiology:
         render_radiology_tab()
@@ -1428,6 +1993,10 @@ def main() -> None:
         render_guidelines_tab()
     with tab_agent:
         render_agent_tab(patient)
+        st.markdown("<hr style='border:none;border-top:1px solid #E2E8F0;margin:28px 0;'>", unsafe_allow_html=True)
+        render_feedback_panel(patient)
+    with tab_records:
+        render_records_tab()
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import shutil
 from functools import lru_cache
 from pathlib import Path
 
@@ -18,22 +19,26 @@ DB_DIR = Path("./chroma_db")
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 120
-DEFAULT_K = 2
+DEFAULT_K = 4   # increased from 2 so more guideline passages are returned
 
 
 # --------------------------------------------------------------------------- #
-# Index building -- run this once (or whenever ./sample-docs changes), not
-# from the query path. If you already have a separate ingestion script,
-# this is redundant and you can drop it; kept here so this module is
-# self-contained.
+# Index building
 # --------------------------------------------------------------------------- #
 def build_index(docs_path: Path = DOCS_DIR, db_dir: Path = DB_DIR) -> int:
     """Load, chunk, embed, and persist the document set. Returns the
-    number of chunks indexed."""
+    number of chunks indexed. Wipes an existing DB first so it never
+    returns stale results after docs are updated."""
     if not docs_path.exists():
         raise FileNotFoundError(f"Document directory not found at '{docs_path}'.")
 
-    loader = DirectoryLoader(str(docs_path), glob="**/*.txt", loader_cls=TextLoader, recursive=True)
+    loader = DirectoryLoader(
+        str(docs_path),
+        glob="**/*.txt",
+        loader_cls=TextLoader,
+        loader_kwargs={"encoding": "utf-8"},
+        recursive=True,
+    )
     documents = loader.load()
     if not documents:
         raise ValueError(f"No .txt documents found under '{docs_path}'.")
@@ -44,15 +49,44 @@ def build_index(docs_path: Path = DOCS_DIR, db_dir: Path = DB_DIR) -> int:
     logger.info("Split into %d chunk(s).", len(chunks))
 
     embeddings = _load_embeddings()
+
+    # Wipe existing DB so the lru_cache'd vectorstore is also invalidated
+    if db_dir.exists():
+        shutil.rmtree(db_dir)
+        _load_vectorstore.cache_clear()
+        logger.info("Cleared existing vector store at %s.", db_dir)
+
     Chroma.from_documents(chunks, embeddings, persist_directory=str(db_dir))
     logger.info("Persisted vector store to %s.", db_dir)
-
     return len(chunks)
 
 
+def _docs_newer_than_db(docs_path: Path = DOCS_DIR, db_dir: Path = DB_DIR) -> bool:
+    """Return True if any .txt file in docs_path is newer than the chroma.sqlite3 file."""
+    sqlite_file = db_dir / "chroma.sqlite3"
+    if not sqlite_file.exists():
+        return True  # No DB at all — must build
+    db_mtime = sqlite_file.stat().st_mtime
+    for txt in docs_path.rglob("*.txt"):
+        if txt.stat().st_mtime > db_mtime:
+            return True
+    return False
+
+
+def ensure_index_fresh(docs_path: Path = DOCS_DIR, db_dir: Path = DB_DIR) -> None:
+    """Rebuild the vector index if any source document is newer than the DB,
+    or if the DB is missing. Call this once at query time."""
+    if _docs_newer_than_db(docs_path, db_dir):
+        logger.info("Source docs are newer than vector store — rebuilding index...")
+        try:
+            n = build_index(docs_path, db_dir)
+            logger.info("Index rebuilt: %d chunks.", n)
+        except Exception as exc:
+            logger.error("Index rebuild failed: %s", exc)
+
+
 # --------------------------------------------------------------------------- #
-# Cached loaders -- the embedding model and vector store are loaded once
-# per process and reused, instead of being reconstructed on every query.
+# Cached loaders — loaded once per process, cleared when build_index() runs
 # --------------------------------------------------------------------------- #
 @lru_cache(maxsize=1)
 def _load_embeddings() -> HuggingFaceEmbeddings:
@@ -75,20 +109,28 @@ def query_clinical_rag(
     k: int = DEFAULT_K,
 ) -> str:
     """Queries the Chroma vector store for relevant clinical guidelines and
-    returns structured, source-cited text. Never raises -- any failure
-    comes back as a readable "Error: ..." string instead, since this is
-    called directly from both the UI and LLM tool layers.
+    returns structured, source-cited text. Automatically rebuilds the index
+    if source documents have been updated since the last build.
+    Never raises — any failure comes back as a readable error string.
     """
     if not query_text or not query_text.strip():
         return "Error: no query text provided."
 
+    # Auto-rebuild if docs are fresher than the stored DB
+    ensure_index_fresh()
+
     if not Path(db_dir).exists():
-        return f"Error: clinical knowledge base not found at '{db_dir}'. Build it first with build_index()."
+        return (
+            f"Error: clinical knowledge base not found at '{db_dir}'. "
+            "Place .txt guideline files in ./sample-docs and the index will be built automatically."
+        )
 
     try:
+        # Clear the cache so a freshly-rebuilt DB is always loaded
+        _load_vectorstore.cache_clear()
         vectorstore = _load_vectorstore(db_dir)
         results = vectorstore.similarity_search_with_score(query_text, k=k)
-    except Exception as exc:  # noqa: BLE001 -- surface to the caller rather than crash it
+    except Exception as exc:  # noqa: BLE001
         logger.exception("RAG query failed for '%s'.", query_text)
         return f"Error: guideline search failed ({exc})."
 
@@ -98,7 +140,8 @@ def query_clinical_rag(
     citations = []
     for idx, (doc, score) in enumerate(results, start=1):
         source = doc.metadata.get("source", "Unknown Document")
-        relevance = max(0.0, 1 - score) * 100  # Chroma returns a distance; smaller is closer
+        # Chroma cosine distance: 0 = identical, 2 = opposite. Clamp to [0,1] for relevance %.
+        relevance = max(0.0, min(1.0, 1.0 - score)) * 100
         citations.append(
             f"--- Citation {idx} [{source}, {relevance:.0f}% match] ---\n{doc.page_content}"
         )

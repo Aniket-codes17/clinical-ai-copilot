@@ -1,0 +1,83 @@
+Cardiac Findings & ECG Interpretation — Clinical Guidelines (AHA/ACC)
+
+CARDIOMEGALY
+Definition: Cardiothoracic ratio >0.5 on PA chest radiograph.
+Causes: Dilated cardiomyopathy, hypertensive heart disease, valvular disease, pericardial effusion, high-output states.
+Management:
+- Echocardiography: first-line investigation to assess LV function, wall motion, valves, pericardium.
+- BNP/NT-proBNP: elevated (>100 pg/mL / >125 pg/mL respectively) suggests heart failure.
+- Cardiac MRI: gold standard for myocardial fibrosis, infiltration, and cardiomyopathy phenotyping.
+- 12-lead ECG: assess for LVH (Sokolow-Lyon >35mm or Cornell >28mm men / >20mm women), arrhythmia, ischaemia.
+Treatment by etiology:
+- HFrEF (EF <40%): ACE inhibitor/ARB + beta-blocker (Carvedilol/Metoprolol succinate) + MRA (Spironolactone) + SGLT2i (Dapagliflozin). ICD if EF remains <35% despite 3 months GDMT.
+- HFpEF (EF ≥50%): Control blood pressure, diuretics for congestion, SGLT2i (Empagliflozin).
+- Pericardial effusion: Echo-guided pericardiocentesis if tamponade physiology.
+
+PLEURAL EFFUSION
+Definition: Fluid accumulation in pleural space, visible as blunting of costophrenic angle on CXR (typically >200 mL).
+Diagnosis:
+- CXR: blunting of CP angle, meniscus sign, opacification of hemithorax.
+- Ultrasound: more sensitive than CXR; guides diagnostic/therapeutic thoracocentesis.
+- CT chest with contrast: preferred if complex effusion, empyema, or loculation suspected.
+- Thoracocentesis: indicated for effusions >1 cm on lateral decubitus; send for LDH, protein, glucose, pH, cytology, culture.
+Light's Criteria (Exudate if any 1 met):
+  1. Pleural protein/serum protein >0.5
+  2. Pleural LDH/serum LDH >0.6
+  3. Pleural LDH > 2/3 upper limit normal serum LDH
+Management:
+- Transudate: treat underlying cause (CHF, cirrhosis, nephrotic syndrome).
+- Exudate: further workup — TB (ADA >40 U/L), malignancy (cytology), parapneumonic (pH <7.2 drain).
+- Empyema or complicated parapneumonic: chest drain + antibiotics (Tazocin/Meropenem). VATS if loculated.
+- Malignant: PleurX catheter for symptom control; pleurodesis with talc.
+
+ATELECTASIS
+Definition: Collapse or incomplete expansion of lung parenchyma.
+Types: Obstructive (mucus plug, endobronchial lesion), compressive (pleural effusion, pneumothorax), adhesive (surfactant deficiency).
+Management:
+- Chest physiotherapy, incentive spirometry, deep breathing exercises.
+- Bronchoscopy: if mucus plug not cleared by physiotherapy within 24h.
+- Treat underlying cause: antibiotics for pneumonia, drain effusion.
+
+PULMONARY EDEMA
+Cardiogenic: CXR — bilateral perihilar "bat-wing" opacity, Kerley B lines, upper lobe venous diversion.
+Management:
+- IV Furosemide 40-80 mg stat; titrate to urine output 1 mL/kg/h.
+- GTN infusion (0.5-10 mcg/kg/min) for preload/afterload reduction if SBP >90.
+- NIV (CPAP/BiPAP): reduces intubation rate in acute cardiogenic pulmonary edema.
+- Identify and treat precipitant: ACS, AF, hypertensive crisis, medication non-compliance.
+
+ECG INTERPRETATION GUIDELINES
+Heart Rate:
+- Normal: 60-100 bpm. Tachycardia: >100. Bradycardia: <60.
+- Calculate: 300 / number of large squares between consecutive R-waves.
+
+Rhythm Assessment:
+- Sinus rhythm: P before every QRS, regular P-P interval, PR 120-200 ms.
+- Sinus tachycardia (HR >100): causes include fever, pain, hypovolemia, sepsis, PE, anxiety, sympathomimetics.
+- Sinus bradycardia (HR <60): causes include athletic training, vasovagal, hypothyroidism, inferior MI, beta-blockers.
+
+AF (Atrial Fibrillation):
+- Irregularly irregular rhythm, absence of P waves, fibrillatory baseline.
+- Management: rate control (Metoprolol, Diltiazem, Digoxin) vs rhythm control (Flecainide, Amiodarone).
+- Anticoagulation: CHA₂DS₂-VASc score ≥2 (men) or ≥3 (women): DOAC (Apixaban, Rivaroxaban) preferred.
+- Cardioversion: if <48h onset or adequately anticoagulated ≥3 weeks.
+
+ST Changes:
+- ST elevation ≥1 mm in 2+ contiguous leads: STEMI — activate cath lab. Thrombolysis if PCI unavailable within 120 min.
+- ST depression ≥0.5 mm or T-wave inversion: NSTEMI/UA — dual antiplatelet, anticoagulation, risk stratify with GRACE score.
+- Widespread ST elevation + PR depression: pericarditis — NSAIDs + Colchicine 0.5 mg BID x3 months.
+- Saddle-shaped ST elevation: benign early repolarisation vs pericarditis (differentiate by J-point/QTc ratio).
+
+Bundle Branch Blocks:
+- LBBB (QRS >120ms, broad notched R in V5-V6, rS in V1): new LBBB with chest pain = STEMI equivalent (Sgarbossa criteria).
+- RBBB (QRS >120ms, RSR' in V1, broad S in I/V6): often benign; new RBBB with PE risk = Wellens/RBBB pattern.
+
+LVH Criteria:
+- Sokolow-Lyon: S in V1 + R in V5/V6 >35 mm.
+- Cornell: R in aVL + S in V3 >28mm (men) / >20mm (women).
+- Associated with hypertensive heart disease, aortic stenosis, hypertrophic cardiomyopathy.
+
+QTc Prolongation:
+- Normal QTc: <440 ms (men), <460 ms (women). Concerning: >500 ms (Torsades de Pointes risk).
+- Causes: hypokalaemia, hypomagnesaemia, hypocalcaemia, drugs (antipsychotics, macrolides, quinolones, antiemetics).
+- Management: correct electrolytes, remove offending drug, IV Magnesium 2g if symptomatic.
